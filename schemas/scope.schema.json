@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "scope_id": {
+      "minLength": 1,
+      "title": "Scope Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+    },
+    "target_type": {
+      "minLength": 1,
+      "title": "Target Type",
+      "type": "string"
+    },
+    "target": {
+      "minLength": 1,
+      "title": "Target",
+      "type": "string"
+    },
+    "authorization_ref": {
+      "minLength": 1,
+      "title": "Authorization Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "scope_id",
+    "project_id",
+    "target_type",
+    "target",
+    "authorization_ref"
+  ],
+  "title": "Scope",
+  "type": "object"
+}

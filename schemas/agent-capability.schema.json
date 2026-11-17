@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "RiskLevel": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "capability_id": {
+      "minLength": 1,
+      "title": "Capability Id",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "techniques": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Techniques",
+      "type": "array"
+    },
+    "target_types": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Target Types",
+      "type": "array"
+    },
+    "input_schema": {
+      "minLength": 1,
+      "title": "Input Schema",
+      "type": "string"
+    },
+    "output_schema": {
+      "minLength": 1,
+      "title": "Output Schema",
+      "type": "string"
+    },
+    "risk_level": {
+      "$ref": "#/$defs/RiskLevel"
+    },
+    "side_effects": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Side Effects",
+      "type": "array"
+    },
+    "max_concurrency": {
+      "default": 1,
+      "maximum": 64,
+      "minimum": 1,
+      "title": "Max Concurrency",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "capability_id",
+    "name",
+    "techniques",
+    "target_types",
+    "input_schema",
+    "output_schema",
+    "risk_level"
+  ],
+  "title": "AgentCapability",
+  "type": "object"
+}

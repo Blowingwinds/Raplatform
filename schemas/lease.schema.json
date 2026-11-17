@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "lease_id": {
+      "minLength": 1,
+      "title": "Lease Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+    },
+    "resource_ref": {
+      "minLength": 1,
+      "title": "Resource Ref",
+      "type": "string"
+    },
+    "holder_session_id": {
+      "minLength": 1,
+      "title": "Holder Session Id",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "lease_id",
+    "project_id",
+    "resource_ref",
+    "holder_session_id",
+    "expires_at"
+  ],
+  "title": "Lease",
+  "type": "object"
+}

@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "audit_id": {
+      "minLength": 1,
+      "title": "Audit Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+    },
+    "event_type": {
+      "minLength": 1,
+      "title": "Event Type",
+      "type": "string"
+    },
+    "actor_type": {
+      "minLength": 1,
+      "title": "Actor Type",
+      "type": "string"
+    },
+    "actor_id": {
+      "minLength": 1,
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "resource_ref": {
+      "minLength": 1,
+      "title": "Resource Ref",
+      "type": "string"
+    },
+    "details": {
+      "additionalProperties": true,
+      "title": "Details",
+      "type": "object"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "audit_id",
+    "project_id",
+    "event_type",
+    "actor_type",
+    "actor_id",
+    "resource_ref"
+  ],
+  "title": "AuditEvent",
+  "type": "object"
+}

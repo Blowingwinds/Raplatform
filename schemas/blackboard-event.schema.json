@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "minLength": 1,
+      "title": "Event Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+    },
+    "fact_id": {
+      "minLength": 1,
+      "title": "Fact Id",
+      "type": "string"
+    },
+    "event_type": {
+      "minLength": 1,
+      "title": "Event Type",
+      "type": "string"
+    },
+    "fact_version": {
+      "minimum": 1,
+      "title": "Fact Version",
+      "type": "integer"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_id",
+    "project_id",
+    "fact_id",
+    "event_type",
+    "fact_version"
+  ],
+  "title": "BlackboardEvent",
+  "type": "object"
+}

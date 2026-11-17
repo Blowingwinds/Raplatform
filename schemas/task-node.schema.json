@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "ActionConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "authorized_scope_only": {
+          "default": true,
+          "title": "Authorized Scope Only",
+          "type": "boolean"
+        },
+        "max_concurrency": {
+          "default": 1,
+          "maximum": 64,
+          "minimum": 1,
+          "title": "Max Concurrency",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 300,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "ActionConstraints",
+      "type": "object"
+    },
+    "RiskLevel": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    },
+    "TaskLevel": {
+      "enum": [
+        "goal",
+        "tactic",
+        "technique",
+        "action"
+      ],
+      "title": "TaskLevel",
+      "type": "string"
+    },
+    "TaskStatus": {
+      "enum": [
+        "planned",
+        "ready",
+        "waiting_approval",
+        "running",
+        "succeeded",
+        "failed",
+        "blocked",
+        "cancelled"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+    },
+    "parent_task_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Task Id"
+    },
+    "level": {
+      "$ref": "#/$defs/TaskLevel"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "technique_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Technique Id"
+    },
+    "intent": {
+      "minLength": 1,
+      "title": "Intent",
+      "type": "string"
+    },
+    "target_refs": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Target Refs",
+      "type": "array"
+    },
+    "constraints": {
+      "$ref": "#/$defs/ActionConstraints"
+    },
+    "expected_outputs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Expected Outputs",
+      "type": "array"
+    },
+    "risk_level": {
+      "$ref": "#/$defs/RiskLevel",
+      "default": "low"
+    },
+    "status": {
+      "$ref": "#/$defs/TaskStatus",
+      "default": "planned"
+    }
+  },
+  "required": [
+    "task_id",
+    "project_id",
+    "level",
+    "name",
+    "intent",
+    "target_refs"
+  ],
+  "title": "TaskNode",
+  "type": "object"
+}

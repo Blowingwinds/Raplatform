@@ -1,0 +1,50 @@
+{
+  "$defs": {
+    "SessionStatus": {
+      "enum": [
+        "created",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "title": "SessionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {
+      "minLength": 1,
+      "title": "Session Id",
+      "type": "string"
+    },
+    "project_id": {
+      "minLength": 1,
+      "title": "Project Id",
+      "type": "string"
+    },
+    "task_id": {
+      "minLength": 1,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "agent_id": {
+      "minLength": 1,
+      "title": "Agent Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/SessionStatus",
+      "default": "created"
+    }
+  },
+  "required": [
+    "session_id",
+    "project_id",
+    "task_id",
+    "agent_id"
+  ],
+  "title": "ExecutionSession",
+  "type": "object"
+}
