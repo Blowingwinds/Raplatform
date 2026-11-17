@@ -111,6 +111,18 @@ class SQLiteStore:
     def get_capability(self, capability_id: str) -> AgentCapability | None:
         return self._get("capabilities", "capability_id", capability_id, AgentCapability)
 
+    def delete_capability(self, capability_id: str) -> None:
+        cursor = self._connection.execute(
+            "DELETE FROM capabilities WHERE capability_id = ?", (capability_id,)
+        )
+        if cursor.rowcount != 1:
+            raise ValueError(f"capability {capability_id} does not exist")
+        self._connection.commit()
+
+    def list_capabilities(self) -> list[AgentCapability]:
+        rows = self._connection.execute("SELECT payload FROM capabilities ORDER BY capability_id").fetchall()
+        return [AgentCapability.model_validate(json.loads(row["payload"])) for row in rows]
+
     def save_evidence(self, evidence: Evidence) -> None:
         self._save("evidence", "evidence_id", evidence.evidence_id, evidence.model_dump(mode="json"))
 
