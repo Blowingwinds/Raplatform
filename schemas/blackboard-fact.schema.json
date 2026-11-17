@@ -1,4 +1,15 @@
 {
+  "$defs": {
+    "FactState": {
+      "enum": [
+        "active",
+        "invalidated",
+        "conflicted"
+      ],
+      "title": "FactState",
+      "type": "string"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "fact_id": {
@@ -57,6 +68,10 @@
       "minimum": 1,
       "title": "Version",
       "type": "integer"
+    },
+    "state": {
+      "$ref": "#/$defs/FactState",
+      "default": "active"
     }
   },
   "required": [

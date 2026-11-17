@@ -1,4 +1,94 @@
 {
+  "$defs": {
+    "BlackboardFact": {
+      "additionalProperties": false,
+      "properties": {
+        "fact_id": {
+          "minLength": 1,
+          "title": "Fact Id",
+          "type": "string"
+        },
+        "project_id": {
+          "minLength": 1,
+          "title": "Project Id",
+          "type": "string"
+        },
+        "fact_type": {
+          "minLength": 1,
+          "title": "Fact Type",
+          "type": "string"
+        },
+        "asset_ref": {
+          "minLength": 1,
+          "title": "Asset Ref",
+          "type": "string"
+        },
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "source_agent": {
+          "minLength": 1,
+          "title": "Source Agent",
+          "type": "string"
+        },
+        "session_id": {
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "evidence_ref": {
+          "minLength": 1,
+          "title": "Evidence Ref",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/FactState",
+          "default": "active"
+        }
+      },
+      "required": [
+        "fact_id",
+        "project_id",
+        "fact_type",
+        "asset_ref",
+        "data",
+        "confidence",
+        "source_agent",
+        "session_id",
+        "evidence_ref"
+      ],
+      "title": "BlackboardFact",
+      "type": "object"
+    },
+    "FactState": {
+      "enum": [
+        "active",
+        "invalidated",
+        "conflicted"
+      ],
+      "title": "FactState",
+      "type": "string"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "event_id": {
@@ -25,6 +115,34 @@
       "minimum": 1,
       "title": "Fact Version",
       "type": "integer"
+    },
+    "sequence": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "observation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BlackboardFact"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "current_fact": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BlackboardFact"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "created_at": {
       "format": "date-time",

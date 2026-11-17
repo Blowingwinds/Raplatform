@@ -129,6 +129,25 @@ class SQLiteStore:
             raise ValueError(f"fact {fact.fact_id} does not exist")
         self._connection.commit()
 
+    def record_fact_event(self, fact: BlackboardFact, event: BlackboardEvent, *, exists: bool) -> None:
+        with self._connection:
+            if exists:
+                cursor = self._connection.execute(
+                    "UPDATE facts SET payload = ? WHERE fact_id = ?",
+                    (json.dumps(fact.model_dump(mode="json"), ensure_ascii=False), fact.fact_id),
+                )
+                if cursor.rowcount != 1:
+                    raise ValueError(f"fact {fact.fact_id} does not exist")
+            else:
+                self._connection.execute(
+                    "INSERT INTO facts (fact_id, payload) VALUES (?, ?)",
+                    (fact.fact_id, json.dumps(fact.model_dump(mode="json"), ensure_ascii=False)),
+                )
+            self._connection.execute(
+                "INSERT INTO blackboard_events (event_id, payload) VALUES (?, ?)",
+                (event.event_id, json.dumps(event.model_dump(mode="json"), ensure_ascii=False)),
+            )
+
     def get_fact(self, fact_id: str) -> BlackboardFact | None:
         return self._get("facts", "fact_id", fact_id, BlackboardFact)
 

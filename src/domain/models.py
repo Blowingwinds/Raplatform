@@ -40,6 +40,12 @@ class SessionStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class FactState(StrEnum):
+    ACTIVE = "active"
+    INVALIDATED = "invalidated"
+    CONFLICTED = "conflicted"
+
+
 class DomainModel(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -72,16 +78,6 @@ class Lease(DomainModel):
     resource_ref: str = Field(min_length=1)
     holder_session_id: str = Field(min_length=1)
     expires_at: datetime
-
-
-class BlackboardEvent(DomainModel):
-    event_id: str = Field(min_length=1)
-    project_id: str = Field(min_length=1)
-    fact_id: str = Field(min_length=1)
-    event_type: str = Field(min_length=1)
-    fact_version: int = Field(ge=1)
-    sequence: int = Field(default=1, ge=1)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AuditEvent(DomainModel):
@@ -147,6 +143,36 @@ class BlackboardFact(DomainModel):
     evidence_ref: str = Field(min_length=1)
     observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     version: int = Field(default=1, ge=1)
+    state: FactState = FactState.ACTIVE
+
+
+class AgentObservation(DomainModel):
+    fact_type: str = Field(min_length=1)
+    asset_ref: str = Field(min_length=1)
+    data: dict[str, Any]
+    identity: dict[str, str | int | float | bool] = Field(default_factory=dict)
+    confidence: float = Field(ge=0.0, le=1.0)
+    state: FactState = FactState.ACTIVE
+    observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("state")
+    @classmethod
+    def observation_cannot_be_conflicted(cls, value: FactState) -> FactState:
+        if value is FactState.CONFLICTED:
+            raise ValueError("agents cannot declare a conflict state")
+        return value
+
+
+class BlackboardEvent(DomainModel):
+    event_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    fact_id: str = Field(min_length=1)
+    event_type: str = Field(min_length=1)
+    fact_version: int = Field(ge=1)
+    sequence: int = Field(default=1, ge=1)
+    observation: BlackboardFact | None = None
+    current_fact: BlackboardFact | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Evidence(DomainModel):

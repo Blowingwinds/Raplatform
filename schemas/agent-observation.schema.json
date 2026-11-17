@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "FactState": {
+      "enum": [
+        "active",
+        "invalidated",
+        "conflicted"
+      ],
+      "title": "FactState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "fact_type": {
+      "minLength": 1,
+      "title": "Fact Type",
+      "type": "string"
+    },
+    "asset_ref": {
+      "minLength": 1,
+      "title": "Asset Ref",
+      "type": "string"
+    },
+    "data": {
+      "additionalProperties": true,
+      "title": "Data",
+      "type": "object"
+    },
+    "identity": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "title": "Identity",
+      "type": "object"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "state": {
+      "$ref": "#/$defs/FactState",
+      "default": "active"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "fact_type",
+    "asset_ref",
+    "data",
+    "confidence"
+  ],
+  "title": "AgentObservation",
+  "type": "object"
+}
