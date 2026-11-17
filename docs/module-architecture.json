@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "mode": "architecture",
+  "template_type": "architecture",
+  "style": 1,
+  "quality_profile": "standard",
+  "width": 1200,
+  "height": 970,
+  "title": "自动化渗透测试系统 · 模块架构",
+  "subtitle": "云端大模型编排 · Agent 平台接入 · MCP 能力治理 · 目标黑板协同",
+  "meta_center": "PTT ORCHESTRATION / AGENT FABRIC / TARGET BLACKBOARD",
+  "meta_right": "MODULE VIEW · MVP",
+  "containers": [
+    { "id": "intent-layer", "x": 40, "y": 120, "width": 1120, "height": 120, "label": "01 目标与知识层" },
+    { "id": "control-layer", "x": 40, "y": 275, "width": 1120, "height": 190, "label": "02 编排与治理层" },
+    { "id": "agent-layer", "x": 40, "y": 500, "width": 1120, "height": 175, "label": "03 Agent 执行层" },
+    { "id": "state-layer", "x": 40, "y": 710, "width": 1120, "height": 135, "label": "04 共享状态与产出层" }
+  ],
+  "nodes": [
+    { "id": "operator", "kind": "speech", "x": 70, "y": 158, "width": 180, "height": 55, "label": "测试目标 / 授权范围", "sublabel": "项目入口", "fill": "#eff6ff", "stroke": "#93c5fd", "flat": true },
+    { "id": "api", "kind": "hexagon", "x": 310, "y": 158, "width": 190, "height": 55, "label": "平台 API", "sublabel": "鉴权 · 项目 · 任务", "fill": "#f8fafc", "stroke": "#94a3b8" },
+    { "id": "llm", "kind": "double_rect", "x": 560, "y": 148, "width": 245, "height": 75, "label": "云端大模型", "sublabel": "意图理解 · 候选编排 · 总结", "fill": "#faf5ff", "stroke": "#a855f7", "glow": "purple" },
+    { "id": "knowledge", "kind": "cylinder", "x": 900, "y": 148, "width": 220, "height": 75, "label": "ATT&CK / RAG 知识库", "sublabel": "战术 · 技术 · 约束", "fill": "#f0fdf4", "stroke": "#22c55e", "glow": "green" },
+
+    { "id": "ptt", "kind": "double_rect", "x": 75, "y": 320, "width": 220, "height": 75, "label": "PTT 任务树编排器", "sublabel": "Goal → Tactic → Technique → Action", "fill": "#faf5ff", "stroke": "#8b5cf6", "glow": "purple" },
+    { "id": "router", "kind": "rect", "x": 360, "y": 320, "width": 220, "height": 75, "label": "Agent Router", "sublabel": "能力 · 负载 · 风险匹配", "fill": "#eff6ff", "stroke": "#60a5fa" },
+    { "id": "policy", "kind": "rect", "x": 645, "y": 320, "width": 220, "height": 75, "label": "策略与范围校验", "sublabel": "Schema · 授权 · 风险", "fill": "#fff7ed", "stroke": "#fb923c" },
+    { "id": "hitl", "kind": "speech", "x": 930, "y": 320, "width": 200, "height": 75, "label": "HITL 审核", "sublabel": "高风险动作人工批准", "fill": "#fef2f2", "stroke": "#f87171", "flat": true },
+
+    { "id": "registry", "kind": "cylinder", "x": 75, "y": 535, "width": 210, "height": 75, "label": "Agent Registry", "sublabel": "能力声明 · 版本 · 状态", "fill": "#f8fafc", "stroke": "#64748b" },
+    { "id": "mcp", "kind": "hexagon", "x": 355, "y": 535, "width": 220, "height": 75, "label": "MCP Gateway", "sublabel": "发现 · Schema · 审计", "fill": "#eff6ff", "stroke": "#2563eb" },
+    { "id": "agents", "kind": "double_rect", "x": 645, "y": 525, "width": 250, "height": 95, "label": "异构 Agent 集群", "sublabel": "侦察 · 识别 · 验证 · 报告", "fill": "#f0fdfa", "stroke": "#14b8a6", "glow": "green" },
+    { "id": "session", "kind": "rect", "x": 965, "y": 535, "width": 165, "height": 75, "label": "Session Manager", "sublabel": "启动 · 取消 · 恢复", "fill": "#f8fafc", "stroke": "#94a3b8" },
+
+    { "id": "blackboard", "kind": "cylinder", "x": 75, "y": 747, "width": 230, "height": 75, "label": "目标黑板", "sublabel": "共享真值 · 态势增量 · 证据", "fill": "#f0fdf4", "stroke": "#16a34a", "glow": "green" },
+    { "id": "lease", "kind": "rect", "x": 380, "y": 747, "width": 205, "height": 75, "label": "Lease / 仲裁", "sublabel": "锁定 · 租约 · 冲突控制", "fill": "#fff7ed", "stroke": "#f97316" },
+    { "id": "normalize", "kind": "rect", "x": 660, "y": 747, "width": 220, "height": 75, "label": "结果归一化", "sublabel": "资产 · 漏洞 · 证据 · 副作用", "fill": "#eff6ff", "stroke": "#3b82f6" },
+    { "id": "report", "kind": "document", "x": 960, "y": 747, "width": 170, "height": 75, "label": "报告与审计", "sublabel": "可追溯输出", "fill": "#f8fafc", "stroke": "#64748b" }
+  ],
+  "arrows": [
+    { "id": "intent-api", "source": "operator", "target": "api", "source_port": "right", "target_port": "left", "flow": "control" },
+    { "id": "api-llm", "source": "api", "target": "llm", "source_port": "right", "target_port": "left", "flow": "control" },
+    { "id": "knowledge-llm", "source": "knowledge", "target": "llm", "source_port": "left", "target_port": "right", "flow": "read" },
+    { "id": "llm-ptt", "source": "llm", "target": "ptt", "source_port": "bottom", "target_port": "top", "flow": "control" },
+    { "id": "ptt-router", "source": "ptt", "target": "router", "source_port": "right", "target_port": "left", "flow": "control" },
+    { "id": "router-registry", "source": "router", "target": "registry", "source_port": "bottom", "target_port": "top", "flow": "read" },
+    { "id": "router-policy", "source": "router", "target": "policy", "source_port": "right", "target_port": "left", "flow": "control" },
+    { "id": "policy-hitl", "source": "policy", "target": "hitl", "source_port": "right", "target_port": "left", "flow": "control" },
+    { "id": "policy-mcp", "source": "policy", "target": "mcp", "source_port": "bottom", "target_port": "top", "flow": "control" },
+    { "id": "registry-mcp", "source": "registry", "target": "mcp", "source_port": "right", "target_port": "left", "flow": "data" },
+    { "id": "mcp-agents", "source": "mcp", "target": "agents", "source_port": "right", "target_port": "left", "flow": "control" },
+    { "id": "agents-session", "source": "agents", "target": "session", "source_port": "right", "target_port": "left", "flow": "async" },
+    { "id": "session-normalize", "source": "session", "target": "normalize", "source_port": "bottom", "target_port": "top", "flow": "data" },
+    { "id": "normalize-blackboard", "source": "normalize", "target": "blackboard", "source_port": "left", "target_port": "right", "flow": "write" },
+    { "id": "lease-mcp", "source": "lease", "target": "mcp", "source_port": "top", "target_port": "bottom", "flow": "control" },
+    { "id": "blackboard-ptt", "source": "blackboard", "target": "ptt", "source_port": "top", "target_port": "bottom", "flow": "feedback" },
+    { "id": "blackboard-report", "source": "blackboard", "target": "report", "source_port": "right", "target_port": "left", "flow": "data" },
+    { "id": "normalize-report", "source": "normalize", "target": "report", "source_port": "right", "target_port": "left", "flow": "data" }
+  ],
+  "legend_orientation": "horizontal",
+  "legend_x": 65,
+  "legend_y": 900,
+  "legend_locked": false,
+  "legend": [
+    { "flow": "control", "label": "控制 / 编排" },
+    { "flow": "read", "label": "知识 / 能力读取" },
+    { "flow": "write", "label": "黑板写入" },
+    { "flow": "data", "label": "结果数据" },
+    { "flow": "feedback", "label": "动态反馈" }
+  ],
+  "footer": "原型边界：平台负责编排、治理、协同与审计；具体执行能力由已注册 Agent 通过 MCP 提供",
+  "footer_x": 65,
+  "footer_y": 945
+}

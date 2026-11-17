@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 970" width="1200" height="970" data-generator="fireworks-tech-graph" data-schema-version="1" data-text-metrics="heuristic-v1" data-style-id="1" data-visual-theme="Flat Icon" data-diagram-type="architecture" data-motion-scene="" data-semantic-profile="generic" data-semantic-valid="true" data-quality-profile="standard" data-max-bends-per-edge="12" data-max-total-bends="100" data-max-route-stretch="5.0" data-max-bridged-crossings="8" data-min-node-gap="0.0" data-min-container-gutter="0.0" data-min-label-clearance="2.0" data-min-segment-length="0.0">
+  <defs>
+    <marker id="arrowA" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowB" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#10b981"/>
+    </marker>
+    <marker id="arrowC" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowE" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f97316"/>
+    </marker>
+    <marker id="arrowF" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowG" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444"/>
+    </marker>
+    <marker id="arrowH" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/>
+    </marker>
+    <filter id="shadowSoft" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <filter id="shadowGlass" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#020617" flood-opacity="0.28"/>
+    </filter>
+    <style>
+    text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+    .title { font-size: 30px; font-weight: 700; fill: #111827; }
+    .subtitle { font-size: 14px; font-weight: 500; fill: #6b7280; }
+    .section { font-size: 13px; font-weight: 700; fill: #2563eb; letter-spacing: 1.4px; }
+    .section-sub { font-size: 12px; font-weight: 500; fill: #94a3b8; }
+    .node-title { font-weight: 700; fill: #111827; }
+    .node-sub { font-size: 12px; font-weight: 500; fill: #6b7280; }
+    .node-type { font-size: 12px; font-weight: 700; fill: #9ca3af; letter-spacing: 0.08em; }
+    .arrow-label { font-size: 12px; font-weight: 600; fill: #6b7280; }
+    .legend { font-size: 12px; font-weight: 500; fill: #6b7280; }
+    .footnote { font-size: 12px; font-weight: 500; fill: #94a3b8; }
+    .metric-label { font-size: 8.5px; font-weight: 700; fill: #94a3b8; text-transform: uppercase; }
+    .metric-value { font-size: 9.5px; font-weight: 700; fill: #111827; }
+    </style>
+  </defs>
+  <rect data-graph-role="background" width="1200.0" height="970.0" fill="#ffffff"/>
+  <text x="600.0" y="24" text-anchor="middle" font-size="11.0" font-weight="600" fill="#94a3b8">PTT ORCHESTRATION / AGENT FABRIC / TARGET BLACKBOARD</text>
+  <text x="1172.0" y="24" text-anchor="end" font-size="11.0" font-weight="600" fill="#94a3b8">MODULE VIEW · MVP</text>
+  <text x="600.0" y="56" text-anchor="middle" class="title">自动化渗透测试系统 · 模块架构</text>
+  <text x="600.0" y="82" text-anchor="middle" class="subtitle">云端大模型编排 · Agent 平台接入 · MCP 能力治理 · 目标黑板协同</text>
+  <g id="intent-layer" data-graph-role="container" data-container-id="intent-layer" data-semantic-role="boundary" data-graph-bounds="40,120,1160,240">
+  <rect data-graph-role="container" x="40.0" y="120.0" width="1120.0" height="120.0" rx="16.0" fill="none" stroke="#dbe5f1" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <text x="58.0" y="144.0" class="section">01 目标与知识层</text>
+    <rect id="intent-layer-header" data-graph-role="reserved" data-reserved-kind="container-header" x="48" y="126" width="127.76" height="30" fill="none" stroke="none"/>
+  </g>
+  <g id="control-layer" data-graph-role="container" data-container-id="control-layer" data-semantic-role="boundary" data-graph-bounds="40,275,1160,465">
+  <rect data-graph-role="container" x="40.0" y="275.0" width="1120.0" height="190.0" rx="16.0" fill="none" stroke="#dbe5f1" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <text x="58.0" y="299.0" class="section">02 编排与治理层</text>
+    <rect id="control-layer-header" data-graph-role="reserved" data-reserved-kind="container-header" x="48" y="281" width="127.76" height="30" fill="none" stroke="none"/>
+  </g>
+  <g id="agent-layer" data-graph-role="container" data-container-id="agent-layer" data-semantic-role="boundary" data-graph-bounds="40,500,1160,675">
+  <rect data-graph-role="container" x="40.0" y="500.0" width="1120.0" height="175.0" rx="16.0" fill="none" stroke="#dbe5f1" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <text x="58.0" y="524.0" class="section">03 AGENT 执行层</text>
+    <rect id="agent-layer-header" data-graph-role="reserved" data-reserved-kind="container-header" x="48" y="506" width="131.14" height="30" fill="none" stroke="none"/>
+  </g>
+  <g id="state-layer" data-graph-role="container" data-container-id="state-layer" data-semantic-role="boundary" data-graph-bounds="40,710,1160,845">
+  <rect data-graph-role="container" x="40.0" y="710.0" width="1120.0" height="135.0" rx="16.0" fill="none" stroke="#dbe5f1" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <text x="58.0" y="734.0" class="section">04 共享状态与产出层</text>
+    <rect id="state-layer-header" data-graph-role="reserved" data-reserved-kind="container-header" x="48" y="716" width="153.76" height="30" fill="none" stroke="none"/>
+  </g>
+  <path id="intent-api" data-graph-role="edge" data-edge-id="intent-api" data-source="operator" data-target="api" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 250,185.5 L 310,185.5" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="api-llm" data-graph-role="edge" data-edge-id="api-llm" data-source="api" data-target="llm" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 500,185.5 L 560,185.5" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="knowledge-llm" data-graph-role="edge" data-edge-id="knowledge-llm" data-source="knowledge" data-target="llm" data-edge-kind="flow" data-topic-id="" data-flow="read" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 900,185.5 L 805,185.5" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowC)"/>
+  <path id="llm-ptt" data-graph-role="edge" data-edge-id="llm-ptt" data-source="llm" data-target="ptt" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 682.5,223 L 682.5,237 L 185,237 L 185,320" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="ptt-router" data-graph-role="edge" data-edge-id="ptt-router" data-source="ptt" data-target="router" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 295,357.5 L 360,357.5" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="router-registry" data-graph-role="edge" data-edge-id="router-registry" data-source="router" data-target="registry" data-edge-kind="flow" data-topic-id="" data-flow="read" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 470,395 L 470,419 L 180,419 L 180,535" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowC)"/>
+  <path id="router-policy" data-graph-role="edge" data-edge-id="router-policy" data-source="router" data-target="policy" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 580,357.5 L 645,357.5" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="policy-hitl" data-graph-role="edge" data-edge-id="policy-hitl" data-source="policy" data-target="hitl" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 865,357.5 L 930,357.5" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="policy-mcp" data-graph-role="edge" data-edge-id="policy-mcp" data-source="policy" data-target="mcp" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 755,395 L 755,465 L 465,465 L 465,535" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="registry-mcp" data-graph-role="edge" data-edge-id="registry-mcp" data-source="registry" data-target="mcp" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 285,572.5 L 355,572.5" fill="none" stroke="#f97316" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowE)"/>
+  <path id="mcp-agents" data-graph-role="edge" data-edge-id="mcp-agents" data-source="mcp" data-target="agents" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 575,572.5 L 645,572.5" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="agents-session" data-graph-role="edge" data-edge-id="agents-session" data-source="agents" data-target="session" data-edge-kind="flow" data-topic-id="" data-flow="async" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 895,572.5 L 965,572.5" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="session-normalize" data-graph-role="edge" data-edge-id="session-normalize" data-source="session" data-target="normalize" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 1047.5,610 L 1047.5,644 L 770,644 L 770,747" fill="none" stroke="#f97316" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowE)"/>
+  <path id="normalize-blackboard" data-graph-role="edge" data-edge-id="normalize-blackboard" data-source="normalize" data-target="blackboard" data-edge-kind="flow" data-topic-id="" data-flow="write" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="4" data-route-stretch="1.288" data-bridges="" d="M 660,784.5 L 639.6,784.5 L 639.6,846 L 325.4,846 L 325.4,793.5 L 305,793.5" fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowB)"/>
+  <path id="lease-mcp" data-graph-role="edge" data-edge-id="lease-mcp" data-source="lease" data-target="mcp" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 482.5,747 L 482.5,630.4 L 465,630.4 L 465,610" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="blackboard-ptt" data-graph-role="edge" data-edge-id="blackboard-ptt" data-source="blackboard" data-target="ptt" data-edge-kind="flow" data-topic-id="" data-flow="feedback" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="3" data-route-stretch="1.902" data-bridges="" d="M 190,747 L 24,747 L 24,415.4 L 185,415.4 L 185,395" fill="none" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowG)"/>
+  <path id="blackboard-report-bridge-mask" data-graph-role="bridge-mask" data-owner="blackboard-report" d="M 305,775.5 L 305,788.5 A 5 5 0 0 1 305,798.5 L 305,852 L 939.6,852 L 939.6,775.5 L 960,775.5" fill="none" stroke="#ffffff" stroke-width="6.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path id="blackboard-report" data-graph-role="edge" data-edge-id="blackboard-report" data-source="blackboard" data-target="report" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="3" data-route-stretch="1.234" data-bridges="305,793.5" d="M 305,775.5 L 305,788.5 A 5 5 0 0 1 305,798.5 L 305,852 L 939.6,852 L 939.6,775.5 L 960,775.5" fill="none" stroke="#f97316" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowE)"/>
+  <path id="normalize-report-bridge-mask" data-graph-role="bridge-mask" data-owner="normalize-report" d="M 880,784.5 L 889,784.5 L 889,793.5 L 934.6,793.5 A 5 5 0 0 0 944.6,793.5 L 960,793.5" fill="none" stroke="#ffffff" stroke-width="6.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path id="normalize-report" data-graph-role="edge" data-edge-id="normalize-report" data-source="normalize" data-target="report" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="939.6,793.5" d="M 880,784.5 L 889,784.5 L 889,793.5 L 934.6,793.5 A 5 5 0 0 0 944.6,793.5 L 960,793.5" fill="none" stroke="#f97316" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowE)"/>
+  <g id="node-operator" data-graph-role="node" data-node-id="operator" data-semantic-role="speech" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="70,158,250,213">
+  <path d="M 80.0 158.0 L 240.0 158.0 Q 250.0 158.0 250.0 168.0 L 250.0 203.0 Q 250.0 213.0 240.0 213.0 L 96.0 213.0 L 82.0 231.0 L 86.0 213.0 L 80.0 213.0 Q 70.0 213.0 70.0 203.0 L 70.0 168.0 Q 70.0 158.0 80.0 158.0 Z" fill="#eff6ff" stroke="#93c5fd" stroke-width="2.0"/>
+  <text x="160.0" y="185.5" text-anchor="middle" class="node-title" font-size="15.53">测试目标 / 授权范围</text>
+  <text x="160.0" y="207.5" text-anchor="middle" class="node-sub">项目入口</text>
+  </g>
+  <g id="node-api" data-graph-role="node" data-node-id="api" data-semantic-role="hexagon" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="310,158,500,213">
+  <path d="M 332.0 158.0 L 478.0 158.0 L 500.0 185.5 L 478.0 213.0 L 332.0 213.0 L 310.0 185.5 Z" fill="#f8fafc" stroke="#94a3b8" stroke-width="2.0" filter="url(#shadowSoft)"/>
+  <text x="405.0" y="185.5" text-anchor="middle" class="node-title" font-size="18.0">平台 API</text>
+  <text x="405.0" y="207.5" text-anchor="middle" class="node-sub">鉴权 · 项目 · 任务</text>
+  </g>
+  <g id="node-llm" data-graph-role="node" data-node-id="llm" data-semantic-role="double_rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="560,148,805,223">
+  <rect x="560.0" y="148.0" width="245.0" height="75.0" rx="10.0" fill="#faf5ff" stroke="#a855f7" stroke-width="2.0" filter="url(#glowPurple)"/>
+  <rect x="566.0" y="154.0" width="233.0" height="63.0" rx="7.0" fill="none" stroke="#a855f7" stroke-width="1.2" opacity="0.65"/>
+  <text x="682.5" y="185.5" text-anchor="middle" class="node-title" font-size="18.0">云端大模型</text>
+  <text x="682.5" y="207.5" text-anchor="middle" class="node-sub">意图理解 · 候选编排 · 总结</text>
+  </g>
+  <g id="node-knowledge" data-graph-role="node" data-node-id="knowledge" data-semantic-role="cylinder" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="900,148,1120,223">
+  <ellipse cx="1010.0" cy="157.375" rx="55.0" ry="9.375" fill="#f0fdf4" stroke="#22c55e" stroke-width="2.2"/>
+  <rect x="900.0" y="157.375" width="220.0" height="56.25" fill="#f0fdf4" stroke="#22c55e" stroke-width="2.2"/>
+  <ellipse cx="1010.0" cy="213.625" rx="55.0" ry="9.375" fill="#f0fdf4" stroke="#22c55e" stroke-width="2.2"/>
+  <ellipse cx="1010.0" cy="176.5" rx="55.0" ry="9.375" fill="none" stroke="#22c55e" stroke-opacity="0.45" stroke-width="1.2"/>
+  <ellipse cx="1010.0" cy="193.0" rx="55.0" ry="9.375" fill="none" stroke="#22c55e" stroke-opacity="0.25" stroke-width="1.2"/>
+  <text x="1010.0" y="179.5" text-anchor="middle" class="node-title" font-size="17.93">ATT&amp;CK / RAG 知识库</text>
+  <text x="1010.0" y="203.5" text-anchor="middle" class="node-sub">战术 · 技术 · 约束</text>
+  </g>
+  <g id="node-ptt" data-graph-role="node" data-node-id="ptt" data-semantic-role="double_rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="75,320,295,395">
+  <rect x="75.0" y="320.0" width="220.0" height="75.0" rx="10.0" fill="#faf5ff" stroke="#8b5cf6" stroke-width="2.0" filter="url(#glowPurple)"/>
+  <rect x="81.0" y="326.0" width="208.0" height="63.0" rx="7.0" fill="none" stroke="#8b5cf6" stroke-width="1.2" opacity="0.65"/>
+  <text x="185.0" y="357.5" text-anchor="middle" class="node-title" font-size="18.0">PTT 任务树编排器</text>
+  <text x="185.0" y="379.5" text-anchor="middle" class="node-sub">Goal → Tactic → Technique → Action</text>
+  </g>
+  <g id="node-router" data-graph-role="node" data-node-id="router" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="360,320,580,395">
+  <rect x="360.0" y="320.0" width="220.0" height="75.0" rx="10.0" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="470.0" y="357.5" text-anchor="middle" class="node-title" font-size="18.0">Agent Router</text>
+  <text x="470.0" y="379.5" text-anchor="middle" class="node-sub">能力 · 负载 · 风险匹配</text>
+  </g>
+  <g id="node-policy" data-graph-role="node" data-node-id="policy" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="645,320,865,395">
+  <rect x="645.0" y="320.0" width="220.0" height="75.0" rx="10.0" fill="#fff7ed" stroke="#fb923c" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="755.0" y="357.5" text-anchor="middle" class="node-title" font-size="18.0">策略与范围校验</text>
+  <text x="755.0" y="379.5" text-anchor="middle" class="node-sub">Schema · 授权 · 风险</text>
+  </g>
+  <g id="node-hitl" data-graph-role="node" data-node-id="hitl" data-semantic-role="speech" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="930,320,1130,395">
+  <path d="M 940.0 320.0 L 1120.0 320.0 Q 1130.0 320.0 1130.0 330.0 L 1130.0 385.0 Q 1130.0 395.0 1120.0 395.0 L 956.0 395.0 L 942.0 413.0 L 946.0 395.0 L 940.0 395.0 Q 930.0 395.0 930.0 385.0 L 930.0 330.0 Q 930.0 320.0 940.0 320.0 Z" fill="#fef2f2" stroke="#f87171" stroke-width="2.0"/>
+  <text x="1030.0" y="357.5" text-anchor="middle" class="node-title" font-size="18.0">HITL 审核</text>
+  <text x="1030.0" y="379.5" text-anchor="middle" class="node-sub">高风险动作人工批准</text>
+  </g>
+  <g id="node-registry" data-graph-role="node" data-node-id="registry" data-semantic-role="cylinder" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="75,535,285,610">
+  <ellipse cx="180.0" cy="544.375" rx="52.5" ry="9.375" fill="#f8fafc" stroke="#64748b" stroke-width="2.2"/>
+  <rect x="75.0" y="544.375" width="210.0" height="56.25" fill="#f8fafc" stroke="#64748b" stroke-width="2.2"/>
+  <ellipse cx="180.0" cy="600.625" rx="52.5" ry="9.375" fill="#f8fafc" stroke="#64748b" stroke-width="2.2"/>
+  <ellipse cx="180.0" cy="563.5" rx="52.5" ry="9.375" fill="none" stroke="#64748b" stroke-opacity="0.45" stroke-width="1.2"/>
+  <ellipse cx="180.0" cy="580.0" rx="52.5" ry="9.375" fill="none" stroke="#64748b" stroke-opacity="0.25" stroke-width="1.2"/>
+  <text x="180.0" y="566.5" text-anchor="middle" class="node-title" font-size="18.0">Agent Registry</text>
+  <text x="180.0" y="590.5" text-anchor="middle" class="node-sub">能力声明 · 版本 · 状态</text>
+  </g>
+  <g id="node-mcp" data-graph-role="node" data-node-id="mcp" data-semantic-role="hexagon" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="355,535,575,610">
+  <path d="M 377.0 535.0 L 553.0 535.0 L 575.0 572.5 L 553.0 610.0 L 377.0 610.0 L 355.0 572.5 Z" fill="#eff6ff" stroke="#2563eb" stroke-width="2.0" filter="url(#shadowSoft)"/>
+  <text x="465.0" y="572.5" text-anchor="middle" class="node-title" font-size="18.0">MCP Gateway</text>
+  <text x="465.0" y="594.5" text-anchor="middle" class="node-sub">发现 · Schema · 审计</text>
+  </g>
+  <g id="node-agents" data-graph-role="node" data-node-id="agents" data-semantic-role="double_rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="645,525,895,620">
+  <rect x="645.0" y="525.0" width="250.0" height="95.0" rx="10.0" fill="#f0fdfa" stroke="#14b8a6" stroke-width="2.0" filter="url(#glowGreen)"/>
+  <rect x="651.0" y="531.0" width="238.0" height="83.0" rx="7.0" fill="none" stroke="#14b8a6" stroke-width="1.2" opacity="0.65"/>
+  <text x="770.0" y="572.5" text-anchor="middle" class="node-title" font-size="18.0">异构 Agent 集群</text>
+  <text x="770.0" y="594.5" text-anchor="middle" class="node-sub">侦察 · 识别 · 验证 · 报告</text>
+  </g>
+  <g id="node-session" data-graph-role="node" data-node-id="session" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="965,535,1130,610">
+  <rect x="965.0" y="535.0" width="165.0" height="75.0" rx="10.0" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="1047.5" y="572.5" text-anchor="middle" class="node-title" font-size="15.43">Session Manager</text>
+  <text x="1047.5" y="594.5" text-anchor="middle" class="node-sub">启动 · 取消 · 恢复</text>
+  </g>
+  <g id="node-blackboard" data-graph-role="node" data-node-id="blackboard" data-semantic-role="cylinder" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="75,747,305,822">
+  <ellipse cx="190.0" cy="756.375" rx="57.5" ry="9.375" fill="#f0fdf4" stroke="#16a34a" stroke-width="2.2"/>
+  <rect x="75.0" y="756.375" width="230.0" height="56.25" fill="#f0fdf4" stroke="#16a34a" stroke-width="2.2"/>
+  <ellipse cx="190.0" cy="812.625" rx="57.5" ry="9.375" fill="#f0fdf4" stroke="#16a34a" stroke-width="2.2"/>
+  <ellipse cx="190.0" cy="775.5" rx="57.5" ry="9.375" fill="none" stroke="#16a34a" stroke-opacity="0.45" stroke-width="1.2"/>
+  <ellipse cx="190.0" cy="792.0" rx="57.5" ry="9.375" fill="none" stroke="#16a34a" stroke-opacity="0.25" stroke-width="1.2"/>
+  <text x="190.0" y="778.5" text-anchor="middle" class="node-title" font-size="18.0">目标黑板</text>
+  <text x="190.0" y="802.5" text-anchor="middle" class="node-sub">共享真值 · 态势增量 · 证据</text>
+  </g>
+  <g id="node-lease" data-graph-role="node" data-node-id="lease" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="380,747,585,822">
+  <rect x="380.0" y="747.0" width="205.0" height="75.0" rx="10.0" fill="#fff7ed" stroke="#f97316" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="482.5" y="784.5" text-anchor="middle" class="node-title" font-size="18.0">Lease / 仲裁</text>
+  <text x="482.5" y="806.5" text-anchor="middle" class="node-sub">锁定 · 租约 · 冲突控制</text>
+  </g>
+  <g id="node-normalize" data-graph-role="node" data-node-id="normalize" data-semantic-role="rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="660,747,880,822">
+  <rect x="660.0" y="747.0" width="220.0" height="75.0" rx="10.0" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.8" filter="url(#shadowSoft)"/>
+  <text x="770.0" y="784.5" text-anchor="middle" class="node-title" font-size="18.0">结果归一化</text>
+  <text x="770.0" y="806.5" text-anchor="middle" class="node-sub">资产 · 漏洞 · 证据 · 副作用</text>
+  </g>
+  <g id="node-report" data-graph-role="node" data-node-id="report" data-semantic-role="document" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="960,747,1130,822">
+  <path d="M 960.0 747.0 L 1113.5 747.0 L 1130.0 763.5 L 1130.0 822.0 L 960.0 822.0 Z" fill="#f8fafc" stroke="#64748b" stroke-width="2.0" filter="url(#shadowSoft)"/>
+  <path d="M 1113.5 747.0 L 1113.5 763.5 L 1130.0 763.5" fill="none" stroke="#64748b" stroke-width="2.0"/>
+  <line x1="978.0" y1="773.0" x2="1102.0" y2="773.0" stroke="#c4b5fd" stroke-width="1.2"/>
+  <line x1="978.0" y1="787.0" x2="1102.0" y2="787.0" stroke="#c4b5fd" stroke-width="1.2"/>
+  <line x1="978.0" y1="801.0" x2="1102.0" y2="801.0" stroke="#c4b5fd" stroke-width="1.2"/>
+  <line x1="978.0" y1="815.0" x2="1102.0" y2="815.0" stroke="#c4b5fd" stroke-width="1.2"/>
+  <text x="1045.0" y="848.0" text-anchor="middle" class="node-title" font-size="18.0">报告与审计</text>
+  <text x="1045.0" y="866.0" text-anchor="middle" class="node-sub">可追溯输出</text>
+  </g>
+  <g id="legend" data-graph-role="legend">
+    <rect id="legend-zone" data-graph-role="reserved" data-reserved-kind="legend" x="56" y="876" width="637.2" height="46" rx="10" fill="none" stroke="none"/>
+    <line data-graph-role="decoration" x1="66.0" y1="890.0" x2="96.0" y2="890.0" stroke="#7c3aed" stroke-width="2.4" marker-end="url(#arrowA)"/>
+    <text data-graph-role="decoration" x="106.0" y="894.0" class="legend">控制 / 编排</text>
+    <line data-graph-role="decoration" x1="197.6" y1="890.0" x2="227.6" y2="890.0" stroke="#2563eb" stroke-width="2.4" marker-end="url(#arrowC)"/>
+    <text data-graph-role="decoration" x="237.6" y="894.0" class="legend">知识 / 能力读取</text>
+    <line data-graph-role="decoration" x1="353.2" y1="890.0" x2="383.2" y2="890.0" stroke="#10b981" stroke-width="2.4" marker-end="url(#arrowB)"/>
+    <text data-graph-role="decoration" x="393.2" y="894.0" class="legend">黑板写入</text>
+    <line data-graph-role="decoration" x1="469.2" y1="890.0" x2="499.2" y2="890.0" stroke="#f97316" stroke-width="2.4" marker-end="url(#arrowE)"/>
+    <text data-graph-role="decoration" x="509.2" y="894.0" class="legend">结果数据</text>
+    <line data-graph-role="decoration" x1="585.2" y1="890.0" x2="615.2" y2="890.0" stroke="#ef4444" stroke-width="2.4" marker-end="url(#arrowG)"/>
+    <text data-graph-role="decoration" x="625.2" y="894.0" class="legend">动态反馈</text>
+  </g>
+  <g id="footer" data-graph-role="reserved" data-graph-bounds="65,933,394,949">
+  <text x="65.0" y="945.0" class="footnote">原型边界：平台负责编排、治理、协同与审计；具体执行能力由已注册 Agent 通过 MCP 提供</text>
+  </g>
+</svg>

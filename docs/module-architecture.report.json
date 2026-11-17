@@ -1,0 +1,727 @@
+{
+  "schema_version": 1,
+  "input_schema": "v1",
+  "mode": "architecture",
+  "style": {
+    "id": 1,
+    "name": "Flat Icon"
+  },
+  "semantics": {
+    "ok": true,
+    "style": 1,
+    "visual_theme": "Flat Icon",
+    "profile": "generic",
+    "details": {}
+  },
+  "ok": true,
+  "canvas": {
+    "width": 1200.0,
+    "height": 970.0
+  },
+  "text_metrics": "heuristic-v1",
+  "placements": {
+    "legend": {
+      "requested": [
+        65.0,
+        900.0
+      ],
+      "actual": [
+        66.0,
+        890.0
+      ],
+      "moved": true,
+      "bounds": [
+        56.0,
+        876.0,
+        693.2,
+        922.0
+      ]
+    }
+  },
+  "edges": [
+    {
+      "id": "intent-api",
+      "source": "operator",
+      "target": "api",
+      "source_port": [
+        250.0,
+        185.5
+      ],
+      "target_port": [
+        310.0,
+        185.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          250.0,
+          185.5
+        ],
+        [
+          310.0,
+          185.5
+        ]
+      ],
+      "length": 60.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "api-llm",
+      "source": "api",
+      "target": "llm",
+      "source_port": [
+        500.0,
+        185.5
+      ],
+      "target_port": [
+        560.0,
+        185.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          500.0,
+          185.5
+        ],
+        [
+          560.0,
+          185.5
+        ]
+      ],
+      "length": 60.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "knowledge-llm",
+      "source": "knowledge",
+      "target": "llm",
+      "source_port": [
+        900.0,
+        185.5
+      ],
+      "target_port": [
+        805.0,
+        185.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          900.0,
+          185.5
+        ],
+        [
+          805.0,
+          185.5
+        ]
+      ],
+      "length": 95.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "llm-ptt",
+      "source": "llm",
+      "target": "ptt",
+      "source_port": [
+        682.5,
+        223.0
+      ],
+      "target_port": [
+        185.0,
+        320.0
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          682.5,
+          223.0
+        ],
+        [
+          682.5,
+          237.0
+        ],
+        [
+          185.0,
+          237.0
+        ],
+        [
+          185.0,
+          320.0
+        ]
+      ],
+      "length": 594.5,
+      "bends": 2,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "ptt-router",
+      "source": "ptt",
+      "target": "router",
+      "source_port": [
+        295.0,
+        357.5
+      ],
+      "target_port": [
+        360.0,
+        357.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          295.0,
+          357.5
+        ],
+        [
+          360.0,
+          357.5
+        ]
+      ],
+      "length": 65.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "router-registry",
+      "source": "router",
+      "target": "registry",
+      "source_port": [
+        470.0,
+        395.0
+      ],
+      "target_port": [
+        180.0,
+        535.0
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          470.0,
+          395.0
+        ],
+        [
+          470.0,
+          419.0
+        ],
+        [
+          180.0,
+          419.0
+        ],
+        [
+          180.0,
+          535.0
+        ]
+      ],
+      "length": 430.0,
+      "bends": 2,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "router-policy",
+      "source": "router",
+      "target": "policy",
+      "source_port": [
+        580.0,
+        357.5
+      ],
+      "target_port": [
+        645.0,
+        357.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          580.0,
+          357.5
+        ],
+        [
+          645.0,
+          357.5
+        ]
+      ],
+      "length": 65.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "policy-hitl",
+      "source": "policy",
+      "target": "hitl",
+      "source_port": [
+        865.0,
+        357.5
+      ],
+      "target_port": [
+        930.0,
+        357.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          865.0,
+          357.5
+        ],
+        [
+          930.0,
+          357.5
+        ]
+      ],
+      "length": 65.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "policy-mcp",
+      "source": "policy",
+      "target": "mcp",
+      "source_port": [
+        755.0,
+        395.0
+      ],
+      "target_port": [
+        465.0,
+        535.0
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          755.0,
+          395.0
+        ],
+        [
+          755.0,
+          465.0
+        ],
+        [
+          465.0,
+          465.0
+        ],
+        [
+          465.0,
+          535.0
+        ]
+      ],
+      "length": 430.0,
+      "bends": 2,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "registry-mcp",
+      "source": "registry",
+      "target": "mcp",
+      "source_port": [
+        285.0,
+        572.5
+      ],
+      "target_port": [
+        355.0,
+        572.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          285.0,
+          572.5
+        ],
+        [
+          355.0,
+          572.5
+        ]
+      ],
+      "length": 70.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "mcp-agents",
+      "source": "mcp",
+      "target": "agents",
+      "source_port": [
+        575.0,
+        572.5
+      ],
+      "target_port": [
+        645.0,
+        572.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          575.0,
+          572.5
+        ],
+        [
+          645.0,
+          572.5
+        ]
+      ],
+      "length": 70.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "agents-session",
+      "source": "agents",
+      "target": "session",
+      "source_port": [
+        895.0,
+        572.5
+      ],
+      "target_port": [
+        965.0,
+        572.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          895.0,
+          572.5
+        ],
+        [
+          965.0,
+          572.5
+        ]
+      ],
+      "length": 70.0,
+      "bends": 0,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "session-normalize",
+      "source": "session",
+      "target": "normalize",
+      "source_port": [
+        1047.5,
+        610.0
+      ],
+      "target_port": [
+        770.0,
+        747.0
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          1047.5,
+          610.0
+        ],
+        [
+          1047.5,
+          644.0
+        ],
+        [
+          770.0,
+          644.0
+        ],
+        [
+          770.0,
+          747.0
+        ]
+      ],
+      "length": 414.5,
+      "bends": 2,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "normalize-blackboard",
+      "source": "normalize",
+      "target": "blackboard",
+      "source_port": [
+        660.0,
+        784.5
+      ],
+      "target_port": [
+        305.0,
+        793.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          660.0,
+          784.5
+        ],
+        [
+          639.6,
+          784.5
+        ],
+        [
+          639.6,
+          846.0
+        ],
+        [
+          325.4,
+          846.0
+        ],
+        [
+          325.4,
+          793.5
+        ],
+        [
+          305.0,
+          793.5
+        ]
+      ],
+      "length": 469.0,
+      "bends": 4,
+      "route_stretch": 1.288,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "lease-mcp",
+      "source": "lease",
+      "target": "mcp",
+      "source_port": [
+        482.5,
+        747.0
+      ],
+      "target_port": [
+        465.0,
+        610.0
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          482.5,
+          747.0
+        ],
+        [
+          482.5,
+          630.4
+        ],
+        [
+          465.0,
+          630.4
+        ],
+        [
+          465.0,
+          610.0
+        ]
+      ],
+      "length": 154.5,
+      "bends": 2,
+      "route_stretch": 1.0,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "blackboard-ptt",
+      "source": "blackboard",
+      "target": "ptt",
+      "source_port": [
+        190.0,
+        747.0
+      ],
+      "target_port": [
+        185.0,
+        395.0
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          190.0,
+          747.0
+        ],
+        [
+          24.0,
+          747.0
+        ],
+        [
+          24.0,
+          415.4
+        ],
+        [
+          185.0,
+          415.4
+        ],
+        [
+          185.0,
+          395.0
+        ]
+      ],
+      "length": 679.0,
+      "bends": 3,
+      "route_stretch": 1.902,
+      "crossings": [],
+      "bridges": []
+    },
+    {
+      "id": "blackboard-report",
+      "source": "blackboard",
+      "target": "report",
+      "source_port": [
+        305.0,
+        775.5
+      ],
+      "target_port": [
+        960.0,
+        775.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          305.0,
+          775.5
+        ],
+        [
+          305.0,
+          852.0
+        ],
+        [
+          939.6,
+          852.0
+        ],
+        [
+          939.6,
+          775.5
+        ],
+        [
+          960.0,
+          775.5
+        ]
+      ],
+      "length": 808.0,
+      "bends": 3,
+      "route_stretch": 1.234,
+      "crossings": [
+        [
+          305.0,
+          793.5
+        ]
+      ],
+      "bridges": [
+        [
+          305.0,
+          793.5
+        ]
+      ]
+    },
+    {
+      "id": "normalize-report",
+      "source": "normalize",
+      "target": "report",
+      "source_port": [
+        880.0,
+        784.5
+      ],
+      "target_port": [
+        960.0,
+        793.5
+      ],
+      "waypoints": [],
+      "route": [
+        [
+          880.0,
+          784.5
+        ],
+        [
+          889.0,
+          784.5
+        ],
+        [
+          889.0,
+          793.5
+        ],
+        [
+          960.0,
+          793.5
+        ]
+      ],
+      "length": 89.0,
+      "bends": 2,
+      "route_stretch": 1.0,
+      "crossings": [
+        [
+          939.6,
+          793.5
+        ]
+      ],
+      "bridges": [
+        [
+          939.6,
+          793.5
+        ]
+      ]
+    }
+  ],
+  "composition": {
+    "profile": "standard",
+    "ok": true,
+    "score": 76,
+    "metrics": {
+      "total_bends": 22,
+      "bridged_crossings": 2,
+      "max_route_stretch": 1.902,
+      "minimum_node_gap": 60.0,
+      "minimum_container_gutter": 17.0,
+      "shortest_segment": 9.0
+    },
+    "limits": {
+      "profile": "standard",
+      "max_bends_per_edge": 12,
+      "max_total_bends": 100,
+      "max_route_stretch": 5.0,
+      "max_bridged_crossings": 8,
+      "min_node_gap": 0.0,
+      "min_container_gutter": 0.0,
+      "min_label_clearance": 2.0,
+      "min_segment_length": 0.0
+    },
+    "violations": []
+  },
+  "issues": [
+    {
+      "severity": "info",
+      "code": "EDGE_CROSSING_BRIDGED",
+      "element": "blackboard-report",
+      "coordinates": [
+        [
+          305.0,
+          793.5
+        ]
+      ]
+    },
+    {
+      "severity": "info",
+      "code": "EDGE_CROSSING_BRIDGED",
+      "element": "normalize-report",
+      "coordinates": [
+        [
+          939.6,
+          793.5
+        ]
+      ]
+    }
+  ],
+  "summary": {
+    "nodes": 16,
+    "edges": 18,
+    "bridged_crossings": 2
+  }
+}
