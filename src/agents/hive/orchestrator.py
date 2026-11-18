@@ -159,6 +159,7 @@ class HiveOrchestrator:
         llm_model: str = "gpt-4o",
         max_rounds: int = 8,
         verbose: bool = False,
+        demo_mode: bool = False,
         # Test injection points
         transport: Transport | None = None,
         crew_runner: Any = None,  # RealCrewRunner | FakeCrewRunner
@@ -173,7 +174,7 @@ class HiveOrchestrator:
 
         # ── wiring ──
         self._registry = AgentRegistry(store)
-        self._guard = PolicyGuard(store)
+        self._guard = PolicyGuard(store, demo_mode=demo_mode)
         self._blackboard = BlackboardService(store)
 
         # Transport: use InProcessTransport if not injected, with real tool handlers

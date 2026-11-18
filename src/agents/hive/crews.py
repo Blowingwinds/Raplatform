@@ -84,20 +84,38 @@ class FakeCrewRunner:
     verbose: bool = False
 
     # Pattern: tool_name(key='value', ...) or tool_name(target="value")
-    _CALL_RE = re.compile(
-        r"(?P<tool>\w+)\s*\((?P<args>[^)]*)\)",
-    )
+    _TOOL_RE = re.compile(r"(?P<tool>\w+)\s*\(")
     _KWARG_RE = re.compile(
         r"""(?P<key>\w+)\s*=\s*(?:'(?P<sval>[^']*)'|"(?P<dval>[^"]*)"|(?P<nval>[\w./:]+))""",
     )
 
+    @staticmethod
+    def _find_matching_paren(text: str, start: int) -> int:
+        """Return the index of the matching ')' for the '(' at *start*."""
+        depth = 0
+        for i in range(start, len(text)):
+            if text[i] == '(':
+                depth += 1
+            elif text[i] == ')':
+                depth -= 1
+                if depth == 0:
+                    return i
+        return -1
+
     def _extract_tool_calls(self, text: str) -> list[tuple[str, dict[str, Any]]]:
-        """Find all ``tool_name(k1='v1', k2='v2')`` patterns in *text*."""
+        """Find all ``tool_name(k1='v1', k2='v2')`` patterns in *text*.
+
+        Handles nested parentheses inside argument values (e.g. Python code strings).
+        """
         calls: list[tuple[str, dict[str, Any]]] = []
-        for match in self._CALL_RE.finditer(text):
+        for match in self._TOOL_RE.finditer(text):
             tool_name = match.group("tool")
+            open_pos = match.end() - 1  # position of '('
+            close_pos = self._find_matching_paren(text, open_pos)
+            if close_pos == -1:
+                continue
+            args_str = text[open_pos + 1 : close_pos]
             kwargs: dict[str, Any] = {}
-            args_str = match.group("args")
             for km in self._KWARG_RE.finditer(args_str):
                 key = km.group("key")
                 val = km.group("sval") or km.group("dval") or km.group("nval")

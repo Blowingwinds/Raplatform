@@ -1,0 +1,135 @@
+{
+  "$description": "ATT&CK subset for Raplatform MVP — covers tactics and techniques relevant to info gathering, vuln detection, and exploitation. Not a complete ATT&CK knowledge base.",
+
+  "tactics": {
+    "reconnaissance": {
+      "id": "TA0043",
+      "name": "Reconnaissance",
+      "description": "Gathering information to plan future operations",
+      "techniques": ["T1595", "T1592", "T1590", "T1040"]
+    },
+    "discovery": {
+      "id": "TA0007",
+      "name": "Discovery",
+      "description": "Discovering information about the target environment",
+      "techniques": ["T1046", "T1135", "T1018"]
+    },
+    "initial-access": {
+      "id": "TA0001",
+      "name": "Initial Access",
+      "description": "Gaining an initial foothold within the target network",
+      "techniques": ["T1190", "T1133"]
+    },
+    "execution": {
+      "id": "TA0002",
+      "name": "Execution",
+      "description": "Running malicious code on target systems",
+      "techniques": ["T1059", "T1203"]
+    },
+    "lateral-movement": {
+      "id": "TA0008",
+      "name": "Lateral Movement",
+      "description": "Moving through the target environment",
+      "techniques": ["T1210"]
+    }
+  },
+
+  "techniques": {
+    "T1595": {
+      "name": "Active Scanning",
+      "tactic": "reconnaissance",
+      "risk": "low",
+      "target_types": ["ip", "domain", "url", "hostname"],
+      "expected_outputs": ["asset.discovered", "service.exposed", "subdomain.discovered", "fingerprint.detected"],
+      "description": "Actively scan target infrastructure for assets, services, and vulnerabilities"
+    },
+    "T1592": {
+      "name": "Gather Victim Host Information",
+      "tactic": "reconnaissance",
+      "risk": "low",
+      "target_types": ["ip", "hostname"],
+      "expected_outputs": ["asset.discovered", "service.exposed", "fingerprint.detected"],
+      "description": "Gather detailed information about target host configurations"
+    },
+    "T1590": {
+      "name": "Gather Victim Network Information",
+      "tactic": "reconnaissance",
+      "risk": "low",
+      "target_types": ["ip", "domain"],
+      "expected_outputs": ["asset.discovered", "subdomain.discovered"],
+      "description": "Gather information about target network topology"
+    },
+    "T1040": {
+      "name": "Network Sniffing",
+      "tactic": "reconnaissance",
+      "risk": "medium",
+      "target_types": ["ip", "hostname"],
+      "expected_outputs": ["service.exposed", "credential.captured"],
+      "description": "Passively monitor network traffic for information"
+    },
+    "T1046": {
+      "name": "Network Service Discovery",
+      "tactic": "discovery",
+      "risk": "low",
+      "target_types": ["ip", "domain", "hostname"],
+      "expected_outputs": ["asset.discovered", "service.exposed"],
+      "description": "Scan for open ports and running services on target hosts"
+    },
+    "T1135": {
+      "name": "Network Share Discovery",
+      "tactic": "discovery",
+      "risk": "low",
+      "target_types": ["ip", "hostname"],
+      "expected_outputs": ["asset.discovered", "service.exposed"],
+      "description": "Discover shared resources on network hosts"
+    },
+    "T1018": {
+      "name": "Remote System Discovery",
+      "tactic": "discovery",
+      "risk": "low",
+      "target_types": ["ip", "domain"],
+      "expected_outputs": ["asset.discovered"],
+      "description": "Identify remote systems in the target network"
+    },
+    "T1190": {
+      "name": "Exploit Public-Facing Application",
+      "tactic": "initial-access",
+      "risk": "high",
+      "target_types": ["url", "service", "endpoint"],
+      "expected_outputs": ["vulnerability.detected", "credential.captured"],
+      "description": "Exploit vulnerabilities in public-facing web applications and services"
+    },
+    "T1133": {
+      "name": "External Remote Services",
+      "tactic": "initial-access",
+      "risk": "medium",
+      "target_types": ["url", "service"],
+      "expected_outputs": ["vulnerability.detected"],
+      "description": "Exploit exposed remote services for initial access"
+    },
+    "T1059": {
+      "name": "Command and Scripting Interpreter",
+      "tactic": "execution",
+      "risk": "high",
+      "target_types": ["url", "endpoint", "service"],
+      "expected_outputs": ["vulnerability.detected", "credential.captured"],
+      "description": "Execute commands or scripts to validate vulnerabilities"
+    },
+    "T1203": {
+      "name": "Exploitation for Client Execution",
+      "tactic": "execution",
+      "risk": "high",
+      "target_types": ["url", "endpoint"],
+      "expected_outputs": ["vulnerability.detected"],
+      "description": "Exploit client-side vulnerabilities through crafted content"
+    },
+    "T1210": {
+      "name": "Exploitation of Remote Services",
+      "tactic": "lateral-movement",
+      "risk": "critical",
+      "target_types": ["ip", "service", "hostname"],
+      "expected_outputs": ["asset.discovered", "vulnerability.detected", "credential.captured"],
+      "description": "Exploit remote services to move laterally within the network"
+    }
+  }
+}

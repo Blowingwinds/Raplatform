@@ -8,12 +8,12 @@ import json
 import tempfile
 from pathlib import Path
 
-_NUCLEI_PATH = "C:/PTools/nuclei.exe"
+_NUCLEI_PATH = "C:/Users/ASUS/go/bin/nuclei.exe"
 
 # Pass 1: technology fingerprinting (single Wappalyzer-style template)
 _TECH_IDS = "tech-detect"
 
-# Pass 2: vulnerability tags (P0 + P1 + config + CVE)
+# Pass 2: vulnerability tags (P0 + P1 + config + CVE + custom)
 _VULN_TAGS = ",".join([
     # P0
     "sqli", "xss", "file-upload", "auth-bypass",
@@ -23,6 +23,8 @@ _VULN_TAGS = ",".join([
     "exposures", "misconfig", "default-login",
     # CVE (nuclei has 2000+ CVE templates — targeted by fingerprint context)
     "cve",
+    # Custom
+    "injection", "rce",
 ])
 
 _SEVERITY_MAP = {
@@ -41,26 +43,122 @@ _ALL_CATEGORIES = {
 # ---------------------------------------------------------------------------
 # public API — two-pass scan
 # ---------------------------------------------------------------------------
+import re as _re
+
+# Patterns for splitting tech-detect results into specific fingerprint entries
+_TECH_PATTERNS: list[tuple[str, str, str]] = [
+    # (regex, name_template, category)
+    ("Server:\\s*(.+)", "Server: {}", "server"),
+    ("X-Powered-By:\\s*(.+)", "X-Powered-By: {}", "runtime"),
+    ("Generator:\\s*(.+)", "Generator: {}", "framework"),
+    ("Set-Cookie:\\s*(.+?);", "Cookie: {}", "framework"),
+]
+
+# Body patterns for framework detection
+_BODY_PATTERNS: list[tuple[str, str, str]] = [
+    ("wp-content", "WordPress", "cms"),
+    ("wp-includes", "WordPress", "cms"),
+    ("<!-- Generator: (.+) -->", "{}", "framework"),
+    ('<meta name="generator" content="(.+?)"', "{}", "framework"),
+]
+
+
+def _split_tech_detect(entry: dict) -> list[dict]:
+    """Split a tech-detect result into specific technology fingerprint entries."""
+    response = entry.get("response", "")
+    info = entry.get("info", {}) or {}
+    host = entry.get("host", entry.get("matched-at", ""))
+    matched_at = entry.get("matched-at", "")
+
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    if not response:
+        return []
+
+    # Split response into headers and body
+    parts = response.split("\r\n\r\n", 1)
+    headers = parts[0] if parts else ""
+    body = parts[1] if len(parts) > 1 else ""
+
+    # Check header patterns
+    for pattern, name_tpl, category in _TECH_PATTERNS:
+        m = _re.search(pattern, headers, _re.IGNORECASE)
+        if m:
+            val = m.group(1).strip()
+            key = f"{category}:{val}"
+            if key not in seen:
+                seen.add(key)
+                results.append({
+                    "template_id": "tech-detect",
+                    "host": host,
+                    "matched_at": matched_at,
+                    "name": name_tpl.format(val),
+                    "severity": "info",
+                    "extracted": val,
+                    "category": category,
+                })
+
+    # Check body patterns
+    for pattern, name_tpl, category in _BODY_PATTERNS:
+        m = _re.search(pattern, body, _re.IGNORECASE)
+        if m:
+            val = m.group(1).strip() if m.lastindex else name_tpl
+            key = f"{category}:{val}"
+            if key not in seen:
+                seen.add(key)
+                results.append({
+                    "template_id": "tech-detect",
+                    "host": host,
+                    "matched_at": matched_at,
+                    "name": name_tpl.format(val) if "{}" in name_tpl else name_tpl,
+                    "severity": "info",
+                    "extracted": val if m.lastindex else "",
+                    "category": category,
+                })
+
+    # If no patterns matched, return the original generic result
+    if not results:
+        extracted = (
+            entry.get("matcher-name", "")
+            or info.get("metadata", {}).get("product", "")
+            or entry.get("extracted-results", [])
+        )
+        return [{
+            "template_id": entry.get("template-id", ""),
+            "host": host,
+            "matched_at": matched_at,
+            "name": info.get("name", ""),
+            "severity": "info",
+            "extracted": extracted,
+        }]
+
+    return results
+
+
 async def scan_fingerprints(targets: list[str], timeout: float = 120.0) -> list[dict]:
     """Pass 1: detect frameworks, services, and component versions."""
     raw = await _run_nuclei(targets, ids=_TECH_IDS, severity="info,low,medium,high,critical",
                             timeout=timeout, concurrency=15)
     fingerprints: list[dict] = []
     for entry in raw:
-        info = entry.get("info", {}) or {}
-        extracted = (
-            entry.get("matcher-name", "")
-            or info.get("metadata", {}).get("product", "")
-            or entry.get("extracted-results", [])
-        )
-        fingerprints.append({
-            "template_id": entry.get("template-id", ""),
-            "host": entry.get("host", entry.get("matched-at", "")),
-            "matched_at": entry.get("matched-at", ""),
-            "name": info.get("name", ""),
-            "severity": _SEVERITY_MAP.get(info.get("severity", "info"), "info"),
-            "extracted": extracted,
-        })
+        if entry.get("template-id") == "tech-detect":
+            fingerprints.extend(_split_tech_detect(entry))
+        else:
+            info = entry.get("info", {}) or {}
+            extracted = (
+                entry.get("matcher-name", "")
+                or info.get("metadata", {}).get("product", "")
+                or entry.get("extracted-results", [])
+            )
+            fingerprints.append({
+                "template_id": entry.get("template-id", ""),
+                "host": entry.get("host", entry.get("matched-at", "")),
+                "matched_at": entry.get("matched-at", ""),
+                "name": info.get("name", ""),
+                "severity": _SEVERITY_MAP.get(info.get("severity", "info"), "info"),
+                "extracted": extracted,
+            })
     return fingerprints[:50]
 
 
@@ -126,7 +224,8 @@ async def _run_nuclei(
         str(nuclei_path),
         "-list", targets_file,
         "-severity", severity,
-        "-jsonl", "-stats",
+        "-jsonl",
+        "-duc",  # disable update check (prevents network hang)
         "-no-mhe", "-no-interactsh",
         "-timeout", str(int(timeout)),
         "-concurrency", str(concurrency),

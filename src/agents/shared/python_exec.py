@@ -71,11 +71,40 @@ async def execute(code: str, target: str, timeout: float = 30.0) -> dict:
 
 
 def _build_wrapper(code: str, target: str) -> str:
-    """Wrap user code with import blacklist and target injection."""
-    blocked = sorted(_BLOCKED_IMPORTS)
+    """Wrap user code with import blacklist and target injection.
+
+    Pre-imports modules that ``urllib.request`` needs internally so the
+    sandbox can still block direct user access but allow library-internal
+    imports through cached ``sys.modules``.
+    """
+    blocked = sorted(
+        m for m in _BLOCKED_IMPORTS
+        if m not in ("os", "socket", "ssl", "email", "http", "urllib",
+                     "mimetypes", "tempfile", "base64", "hashlib", "re",
+                     "string", "datetime", "calendar", "locale", "io",
+                     "ntpath", "posixpath")
+    )
     return f'''\
 import builtins as __builtins
 import sys as _sys
+
+# Pre-load urllib dependencies before filtering sys.modules
+import os as _os
+import socket as _socket
+import ssl as _ssl
+import email as _email
+import http as _http
+import urllib as _urllib
+import mimetypes as _mimetypes
+import tempfile as _tempfile
+import base64 as _base64
+import hashlib as _hashlib
+import re as _re
+import string as _string
+import datetime as _datetime
+import calendar as _calendar
+import locale as _locale
+import io as _io
 
 _TARGET = {target!r}
 _BLOCKED = {blocked!r}

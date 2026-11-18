@@ -79,6 +79,16 @@ def dns_to_observations(
     ]
 
 
+def _extract_host(url: str) -> str:
+    """Extract the host (IP or hostname) from a URL for identity purposes."""
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(url)
+        return parsed.hostname or url
+    except Exception:
+        return url
+
+
 def endpoints_to_observations(
     results: list[dict],
 ) -> list[dict[str, Any]]:
@@ -87,8 +97,11 @@ def endpoints_to_observations(
         {
             "fact_type": "asset.discovered",
             "asset_ref": r["url"],
-            "data": r,
-            "identity": {"ip": r["url"]},
+            "data": {
+                **r,
+                "ip": _extract_host(r["url"]),
+            },
+            "identity": {"ip": _extract_host(r["url"])},
             "confidence": 0.7,
             "state": "active",
         }
@@ -211,10 +224,17 @@ def sqlmap_to_observations(
 def python_to_observations(
     result: dict, target: str,
 ) -> list[dict[str, Any]]:
-    """Convert Python exec result → vulnerability.detected observations."""
+    """Convert Python exec result → vulnerability.detected observations.
+
+    A verification is considered successful only when the script's stdout
+    contains ``VERIFIED`` (case-sensitive, anchored).  ``exit_code`` alone
+    is not sufficient because the sandbox may exit 0 even on blocked imports.
+    """
     if not result or result.get("error"):
         return []
-    vuln_id = f"py-{target}-{result.get('exit_code', 0)}"
+    stdout = result.get("stdout", "")
+    verified = "VERIFIED" in stdout and "NOT_VERIFIED" not in stdout
+    vuln_id = f"py-{target}-{hash(stdout) & 0xFFFF:04x}"
     return [{
         "fact_type": "vulnerability.detected",
         "asset_ref": target,
@@ -224,11 +244,11 @@ def python_to_observations(
             "severity": "high",
             "category": "custom",
             "matched_at": target,
-            "description": result.get("stdout", "")[:500],
-            "verified": result.get("exit_code", -1) == 0,
+            "description": stdout[:500],
+            "verified": verified,
             "service_ref": target,
         },
         "identity": {"vulnerability_id": vuln_id, "service_ref": target},
-        "confidence": 0.8 if result.get("exit_code") == 0 else 0.3,
+        "confidence": 0.9 if verified else 0.3,
         "state": "active",
     }]

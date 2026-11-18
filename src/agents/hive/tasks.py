@@ -7,7 +7,9 @@ CrewAI ``Task`` objects scoped to the relevant targets / fingerprints / vulns.
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any
+from urllib.parse import urlparse
 
 from crewai import Agent, Task
 
@@ -19,6 +21,66 @@ from src.agents.hive.observation_bridge import (
 )
 from src.agents.web_attack.planner import plan as web_plan
 from src.domain.models import BlackboardFact
+
+
+# ── target parsing ──────────────────────────────────────────────────────
+
+# Matches "host:port" where host is an IP or hostname (no scheme/path)
+_IP_PORT_RE = re.compile(
+    r"^(?P<host>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(?P<port>\d{1,5})$"
+)
+_HOST_PORT_RE = re.compile(
+    r"^(?P<host>[\w.-]+?\.[\w-]+):(?P<port>\d{1,5})$"
+)
+
+
+def _parse_target(target: str) -> tuple[str, int | None, str]:
+    """Extract (host, port, scheme) from a target string.
+
+    >>> _parse_target("127.0.0.1:8000")
+    ('127.0.0.1', 8000, 'http')
+    >>> _parse_target("example.com:8443")
+    ('example.com', 8443, 'https')
+    >>> _parse_target("http://example.com:8000/path")
+    ('example.com', 8000, 'http')
+    >>> _parse_target("127.0.0.1")
+    ('127.0.0.1', None, 'http')
+    """
+    # Full URL
+    if "://" in target:
+        parsed = urlparse(target)
+        host = parsed.hostname or target
+        port = parsed.port
+        scheme = parsed.scheme or "http"
+        return host, port, scheme
+
+    # IP:port
+    m = _IP_PORT_RE.match(target)
+    if m:
+        host = m.group("host")
+        port = int(m.group("port"))
+        scheme = "https" if port == 443 else "http"
+        return host, port, scheme
+
+    # hostname:port
+    m = _HOST_PORT_RE.match(target)
+    if m:
+        host = m.group("host")
+        port = int(m.group("port"))
+        scheme = "https" if port == 443 else "http"
+        return host, port, scheme
+
+    # Bare IP or hostname
+    return target, None, "http"
+
+
+def _build_url(host: str, port: int | None, scheme: str = "http", path: str = "") -> str:
+    """Build a URL from host/port/scheme, omitting default ports."""
+    if port is None:
+        return f"{scheme}://{host}{path}"
+    if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+        return f"{scheme}://{host}{path}"
+    return f"{scheme}://{host}:{port}{path}"
 
 
 # ── fact extractors ─────────────────────────────────────────────────────
@@ -81,12 +143,20 @@ def _targets_needing_recon(
     A seed target is "done" only when it has at least one service.exposed fact
     (meaning port scanning was performed).  asset.discovered and subdomain.discovered
     are informational and don't replace recon.
+
+    Seed targets are normalized: ``127.0.0.1:8000`` and ``127.0.0.1`` match the
+    same host — only the host portion is compared against service.exposed asset_refs.
     """
     already_scanned = {
         f.asset_ref for f in facts if f.fact_type == "service.exposed"
     }
 
-    targets = [t for t in seed_targets if t not in already_scanned]
+    targets = []
+    for t in seed_targets:
+        host, _, _ = _parse_target(t)
+        # Check if bare host or full target already has services
+        if host not in already_scanned and t not in already_scanned:
+            targets.append(t)
 
     # Also scan newly discovered subdomains that haven't been port-scanned yet
     sub_targets = [
@@ -125,18 +195,22 @@ def make_info_tasks(
 
     tasks: list[Task] = []
     for target in targets:
+        host, port, scheme = _parse_target(target)
+        base_url = _build_url(host, port, scheme)
+
         desc = (
             f"Gather information about target: {target}\n\n"
             f"Use these tools in order:\n"
-            f"1. scan_ports(target='{target}') — discover open TCP ports and services\n"
-            f"2. resolve_dns(hostname='{target}') — resolve DNS records\n"
-            f"3. enumerate_subdomains(domain='{target}') — discover subdomains\n"
-            f"4. If HTTP services found: discover_endpoints(base_url='http://{target}')\n"
+            f"1. scan_ports(target='{host}') — discover open TCP ports and services\n"
+            f"2. resolve_dns(hostname='{host}') — resolve DNS records\n"
+            f"3. If the target is a domain: enumerate_subdomains(domain='{host}') — discover subdomains\n"
+            f"4. discover_endpoints(base_url='{base_url}') — brute-force web endpoints\n"
         )
-        # 常见 HTTP 端口兜底探测（80 之外的常用 Web 端口）
-        for port in (443, 8000, 8008, 8080, 8088, 8443, 8888, 3000, 5000, 7000, 9000):
-            scheme = "https" if port == 443 else "http"
-            desc += f"   discover_endpoints(base_url='{scheme}://{target}:{port}')\n"
+        # 常见 HTTP 端口兜底探测（使用裸 host，再拼端口）
+        for extra_port in (443, 8000, 8008, 8080, 8088, 8443, 8888, 3000, 5000, 7000, 9000):
+            extra_scheme = "https" if extra_port == 443 else "http"
+            extra_url = _build_url(host, extra_port, extra_scheme)
+            desc += f"   discover_endpoints(base_url='{extra_url}')\n"
         desc += "Report all findings as structured observations."
         tasks.append(Task(
             description=desc,
@@ -237,10 +311,32 @@ def make_vuln_tasks(
                     agent=framework_agent,
                 ))
 
-    # Web attack tasks
+    # Web attack tasks — also add one broad scan against the base URL
+    # to ensure all vulnerability templates get a chance to match, regardless
+    # of planner-generated per-endpoint probes (which may be too specific for
+    # hand-written template sets).
     if endpoints or services:
         web_plan_result = _run_planner(web_plan, endpoints=endpoints, services=services)
         web_steps = web_plan_result.get("plan", [])
+
+        # Broad scan: run ALL vuln templates against the first HTTP service
+        for svc in services:
+            if svc.get("service_name", "").lower() in ("http", "https", "http-alt", "http-proxy"):
+                asset = svc.get("asset_ref", "")
+                port = svc.get("port", 80)
+                scheme = "https" if port == 443 else "http"
+                broad_url = f"{scheme}://{asset}:{port}" if port not in (80, 443) else f"{scheme}://{asset}"
+                tasks.append(Task(
+                    description=(
+                        f"Broad vulnerability scan against: {broad_url}\n"
+                        f"Run scan_vulnerabilities(target='{broad_url}') using all default vulnerability tags.\n"
+                        f"Report each finding as a vulnerability.detected observation."
+                    ),
+                    expected_output="vulnerability.detected observations for all detected vulnerabilities",
+                    agent=web_agent,
+                ))
+                break  # One broad scan is enough
+
         if web_steps:
             # Group by target
             seen_targets: set[str] = set()
@@ -296,6 +392,55 @@ def make_vuln_tasks(
     return tasks
 
 
+def _verification_code(category: str, target: str, vuln_name: str) -> str:
+    """Generate a Python verification script for a given vuln category.
+
+    All code uses double-quoted strings (no single quotes) and wraps the HTTP
+    call in try/except so non-200 responses don't crash the sandbox subprocess.
+    """
+    head = "try:\n import urllib.request as U,json"
+    tail = "\nexcept Exception as e:\n print(\"NOT_VERIFIED:\"+str(e)[:80])"
+
+    if category == "xss":
+        body = (
+            f'\n r=U.urlopen("{target}",timeout=10)'
+            '\n body=r.read()'
+            '\n print("VERIFIED" if b"<script>alert(1)</script>" in body else "NOT_FOUND")'
+        )
+    elif category in ("sqli", "injection"):
+        body = (
+            f'\n r=U.urlopen("{target}",timeout=10)'
+            '\n body=r.read().decode(errors="replace")'
+            '\n print("VERIFIED" if ("SELECT" in body or "query" in body) else "NOT_FOUND")'
+        )
+    elif category in ("exposures", "misconfig"):
+        body = (
+            f'\n r=U.urlopen("{target}",timeout=10)'
+            '\n body=r.read()'
+            '\n print("VERIFIED" if len(body) > 30 else "NOT_FOUND")'
+        )
+    elif category in ("auth-bypass", "default-login"):
+        body = (
+            f'\n req=U.Request("{target}",headers={{"X-Admin":"1"}})'
+            '\n r=U.urlopen(req,timeout=10)'
+            '\n print("VERIFIED" if r.status == 200 else "NOT_FOUND")'
+        )
+    elif category == "rce":
+        body = (
+            f'\n r=U.urlopen("{target}",timeout=10)'
+            '\n body=r.read().decode(errors="replace")'
+            '\n print("VERIFIED" if ("stdout" in body or "uid=" in body) else "NOT_FOUND")'
+        )
+    else:
+        # Generic: just check if the URL returns content
+        body = (
+            f'\n r=U.urlopen("{target}",timeout=10)'
+            '\n body=r.read()'
+            '\n print("VERIFIED" if len(body) > 50 else "NOT_FOUND")'
+        )
+    return head + body + tail
+
+
 def make_exploit_tasks(
     ctx,  # CrewContext
     facts: list[BlackboardFact],
@@ -320,14 +465,14 @@ def make_exploit_tasks(
                 f"Report the verified result as a vulnerability.detected observation with verified=True."
             )
         else:
+            code = _verification_code(category, target, vuln_name)
             desc = (
-                f"Verify/exploit vulnerability on: {target}\n"
+                f"Verify vulnerability on: {target}\n"
                 f"Vulnerability: {vuln_name}\n"
                 f"Category: {category}\n\n"
-                f"Write and run a Python script to verify this finding. "
-                f"Use execute_python(code='...', target='{target}') to run the verification.\n"
+                f"Run execute_python(code='{code}', target='{target}') to verify this finding.\n"
                 f"Report the result as a vulnerability.detected observation with verified=True "
-                f"if confirmed."
+                f"if the verification script prints VERIFIED."
             )
 
         tasks.append(Task(

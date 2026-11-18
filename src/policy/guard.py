@@ -9,8 +9,9 @@ _HIGH_RISK_THRESHOLD: set[RiskLevel] = {RiskLevel.HIGH, RiskLevel.CRITICAL}
 
 
 class PolicyGuard:
-    def __init__(self, store: SQLiteStore) -> None:
+    def __init__(self, store: SQLiteStore, *, demo_mode: bool = False) -> None:
         self._store = store
+        self._demo_mode = demo_mode
 
     # ------------------------------------------------------------------
     # scope
@@ -31,6 +32,8 @@ class PolicyGuard:
         return risk_level in _HIGH_RISK_THRESHOLD
 
     def needs_approval(self, risk_level: RiskLevel) -> bool:
+        if self._demo_mode:
+            return False
         return self.is_high_risk(risk_level)
 
 

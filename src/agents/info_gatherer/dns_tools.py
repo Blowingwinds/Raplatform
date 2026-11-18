@@ -8,7 +8,7 @@ from pathlib import Path
 import dns.resolver
 import httpx
 
-_SUBFINDER_PATH = "C:/PTools/subfinder.exe"
+_SUBFINDER_PATH = "C:/Users/ASUS/go/bin/subfinder.exe"
 
 
 async def resolve_dns(hostname: str, record_types: list[str] | None = None) -> list[dict]:

@@ -1,0 +1,273 @@
+{
+  "$description": "Mock Planner scenarios — deterministic PTT plans for offline testing and demo. Each scenario maps a fuzzy keyword pattern to a PTT plan.",
+
+  "scenarios": [
+    {
+      "id": "asset_discovery",
+      "keywords": ["发现", "资产", "服务", "扫描", "发现资产", "发现服务", "网段", "端口", "拓扑"],
+      "plan": {
+        "goal": "发现授权网段的资产和服务",
+        "tactics": [
+          {
+            "tactic_id": "reconnaissance",
+            "name": "Reconnaissance",
+            "techniques": [
+              {
+                "technique_id": "T1595",
+                "name": "Active Scanning",
+                "actions": [
+                  {
+                    "action_id": "act-scan-ports",
+                    "name": "扫描目标端口和服务",
+                    "description": "对授权范围内的目标执行 TCP 端口扫描，识别开放端口和运行服务",
+                    "technique_id": "T1595",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["service.exposed"],
+                    "risk_level": "low",
+                    "side_effects": [],
+                    "stop_conditions": ["扫描完成所有目标端口", "超时 300s"]
+                  },
+                  {
+                    "action_id": "act-resolve-dns",
+                    "name": "解析 DNS 记录",
+                    "description": "对授权域名执行 DNS 解析，获取 IP 和子域名信息",
+                    "technique_id": "T1595",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["asset.discovered", "subdomain.discovered"],
+                    "risk_level": "low",
+                    "side_effects": [],
+                    "stop_conditions": ["DNS 解析完成"]
+                  }
+                ]
+              },
+              {
+                "technique_id": "T1590",
+                "name": "Gather Victim Network Information",
+                "actions": [
+                  {
+                    "action_id": "act-enum-subdomains",
+                    "name": "枚举子域名",
+                    "description": "使用被动和主动方法发现目标域名的子域名",
+                    "technique_id": "T1590",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["subdomain.discovered", "asset.discovered"],
+                    "risk_level": "low",
+                    "side_effects": [],
+                    "stop_conditions": ["子域名枚举工具完成"]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tactic_id": "discovery",
+            "name": "Discovery",
+            "techniques": [
+              {
+                "technique_id": "T1046",
+                "name": "Network Service Discovery",
+                "actions": [
+                  {
+                    "action_id": "act-discover-endpoints",
+                    "name": "发现 Web 端点",
+                    "description": "对已发现的 Web 服务执行目录和端点爆破",
+                    "technique_id": "T1046",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["asset.discovered", "service.exposed"],
+                    "risk_level": "low",
+                    "side_effects": ["可能触发 WAF 告警"],
+                    "stop_conditions": ["完成词表爆破", "达到请求速率限制"]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "web_vuln_scan",
+      "keywords": ["漏洞", "扫描", "web", "注入", "xss", "sqli", "探测", "安全"],
+      "plan": {
+        "goal": "扫描 Web 应用漏洞",
+        "tactics": [
+          {
+            "tactic_id": "reconnaissance",
+            "name": "Reconnaissance",
+            "techniques": [
+              {
+                "technique_id": "T1595",
+                "name": "Active Scanning",
+                "actions": [
+                  {
+                    "action_id": "act-scan-ports",
+                    "name": "扫描目标端口和服务",
+                    "description": "识别 Web 服务端口和运行的技术栈",
+                    "technique_id": "T1595",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["service.exposed", "fingerprint.detected"],
+                    "risk_level": "low",
+                    "side_effects": [],
+                    "stop_conditions": ["扫描完成"]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tactic_id": "initial-access",
+            "name": "Initial Access",
+            "techniques": [
+              {
+                "technique_id": "T1190",
+                "name": "Exploit Public-Facing Application",
+                "actions": [
+                  {
+                    "action_id": "act-vuln-scan",
+                    "name": "Web 漏洞扫描",
+                    "description": "使用 nuclei 对 Web 端点执行模板化漏洞扫描",
+                    "technique_id": "T1190",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["vulnerability.detected"],
+                    "risk_level": "medium",
+                    "side_effects": ["可能触发 WAF 告警", "可能在日志中留下扫描痕迹"],
+                    "stop_conditions": ["完成模板扫描", "发现 CRITICAL 漏洞时暂停审批"]
+                  },
+                  {
+                    "action_id": "act-sqli-test",
+                    "name": "SQL 注入测试",
+                    "description": "对带有参数的端点执行 SQL 注入测试",
+                    "technique_id": "T1190",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["vulnerability.detected"],
+                    "risk_level": "high",
+                    "side_effects": ["可能修改数据库状态", "可能触发 WAF"],
+                    "stop_conditions": ["完成注入测试", "触发安全设备告警时暂停"]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "full_pentest",
+      "keywords": ["渗透", "测试", "全部", "完整", "攻击", "pentest", "全面"],
+      "plan": {
+        "goal": "执行完整渗透测试",
+        "tactics": [
+          {
+            "tactic_id": "reconnaissance",
+            "name": "Reconnaissance",
+            "techniques": [
+              {
+                "technique_id": "T1595",
+                "name": "Active Scanning",
+                "actions": [
+                  {
+                    "action_id": "act-scan-ports",
+                    "name": "端口和服务扫描",
+                    "description": "全面扫描授权目标的所有端口和服务",
+                    "technique_id": "T1595",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["service.exposed"],
+                    "risk_level": "low",
+                    "side_effects": [],
+                    "stop_conditions": ["扫描完成"]
+                  }
+                ]
+              },
+              {
+                "technique_id": "T1590",
+                "name": "Gather Victim Network Information",
+                "actions": [
+                  {
+                    "action_id": "act-enum-all",
+                    "name": "子域名和 DNS 枚举",
+                    "description": "全面枚举子域名、DNS 记录和网络拓扑",
+                    "technique_id": "T1590",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["asset.discovered", "subdomain.discovered"],
+                    "risk_level": "low",
+                    "side_effects": [],
+                    "stop_conditions": ["枚举完成"]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tactic_id": "discovery",
+            "name": "Discovery",
+            "techniques": [
+              {
+                "technique_id": "T1046",
+                "name": "Network Service Discovery",
+                "actions": [
+                  {
+                    "action_id": "act-fingerprint",
+                    "name": "技术栈指纹识别",
+                    "description": "识别 Web 服务的技术栈和版本信息",
+                    "technique_id": "T1046",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["fingerprint.detected"],
+                    "risk_level": "low",
+                    "side_effects": [],
+                    "stop_conditions": ["指纹识别完成"]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tactic_id": "initial-access",
+            "name": "Initial Access",
+            "techniques": [
+              {
+                "technique_id": "T1190",
+                "name": "Exploit Public-Facing Application",
+                "actions": [
+                  {
+                    "action_id": "act-vuln-scan",
+                    "name": "全面漏洞扫描",
+                    "description": "扫描 Web 应用的常见漏洞：SQLi、XSS、命令注入、认证绕过、敏感文件暴露",
+                    "technique_id": "T1190",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["vulnerability.detected"],
+                    "risk_level": "medium",
+                    "side_effects": ["可能触发 WAF 告警"],
+                    "stop_conditions": ["完成漏洞扫描", "发现 CRITICAL 漏洞时审批"]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tactic_id": "execution",
+            "name": "Execution",
+            "techniques": [
+              {
+                "technique_id": "T1059",
+                "name": "Command and Scripting Interpreter",
+                "actions": [
+                  {
+                    "action_id": "act-verify",
+                    "name": "漏洞验证",
+                    "description": "对已发现的漏洞执行受控验证，确认漏洞真实存在",
+                    "technique_id": "T1059",
+                    "target_refs": ["*"],
+                    "expected_outputs": ["vulnerability.detected", "credential.captured"],
+                    "risk_level": "high",
+                    "side_effects": ["可能修改目标状态", "需要人工审批"],
+                    "stop_conditions": ["完成验证", "触发安全设备告警时暂停", "超时 120s"]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

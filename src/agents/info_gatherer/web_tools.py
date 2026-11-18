@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import tempfile
 from pathlib import Path
 
-_FFUF_PATH = "C:/PTools/ffuf.exe"
+_FFUF_PATH = "C:/Users/ASUS/go/bin/ffuf.exe"
 
 _WORDLIST: list[str] = [
     "admin", "api", "login", "robots.txt", "sitemap.xml",
@@ -30,6 +31,11 @@ _WORDLIST: list[str] = [
     "exec", "shell", "cmd",
 ]
 
+# Plain-text ffuf output: "name                   [Status: 200, Size: 123, ...]"
+_FFUF_TEXT_RE = re.compile(
+    r"^(?P<name>\S+)\s+\[Status:\s*(?P<status>\d+),\s*Size:\s*(?P<size>\d+)",
+)
+
 
 async def discover_endpoints(base_url: str, wordlist: list[str] | None = None) -> list[dict]:
     ffuf_path = Path(_FFUF_PATH)
@@ -49,7 +55,7 @@ async def discover_endpoints(base_url: str, wordlist: list[str] | None = None) -
             "-u", f"{base_url.rstrip('/')}/FUZZ",
             "-w", wordlist_path,
             "-mc", "200-299,301,302,307,401,405,500",
-            "-of", "json", "-t", "20", "-maxtime", "60", "-noninteractive",
+            "-maxtime", "60", "-noninteractive",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=90.0)
@@ -64,14 +70,25 @@ async def discover_endpoints(base_url: str, wordlist: list[str] | None = None) -
     for line in stdout.decode(errors="replace").splitlines():
         if not line.strip():
             continue
-        try:
-            entry = json.loads(line)
-        except json.JSONDecodeError:
-            continue
 
-        url = entry.get("url", "")
-        status = entry.get("status", 0)
-        content_length = entry.get("length", 0)
+        # Try JSON first (ffuf v2.3+ with -of json)
+        if line.strip().startswith("{"):
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            url = entry.get("url", "")
+            status = entry.get("status", 0)
+            content_length = entry.get("length", 0)
+        else:
+            # Plain text (ffuf v2.1 without -of json)
+            m = _FFUF_TEXT_RE.search(line)
+            if not m:
+                continue
+            name = m.group("name")
+            status = int(m.group("status"))
+            content_length = int(m.group("size"))
+            url = f"{base_url.rstrip('/')}/{name}"
 
         if status in (404, 403, 0):
             continue
