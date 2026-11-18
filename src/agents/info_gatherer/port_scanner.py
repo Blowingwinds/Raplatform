@@ -11,8 +11,15 @@ _BANNER_PROBES: dict[int, bytes] = {
     80: b"GET / HTTP/1.0\r\nHost: {target}\r\n\r\n",
     110: b"\r\n", 143: b"\r\n", 443: b"", 445: b"", 3306: b"", 3389: b"",
     5432: b"", 6379: b"PING\r\n",
-    8080: b"GET / HTTP/1.0\r\nHost: {target}\r\n\r\n", 8443: b"", 27017: b"",
+    8000: b"GET / HTTP/1.0\r\nHost: {target}\r\n\r\n",
+    8008: b"GET / HTTP/1.0\r\nHost: {target}\r\n\r\n",
+    8080: b"GET / HTTP/1.0\r\nHost: {target}\r\n\r\n",
+    8088: b"GET / HTTP/1.0\r\nHost: {target}\r\n\r\n",
+    8443: b"", 8888: b"GET / HTTP/1.0\r\nHost: {target}\r\n\r\n",
+    27017: b"",
 }
+
+_HTTP_PROBE = b"GET / HTTP/1.0\r\nHost: {target}\r\n\r\n"
 
 _COMMON_SERVICES: dict[int, str] = {
     21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns",
@@ -20,8 +27,10 @@ _COMMON_SERVICES: dict[int, str] = {
     139: "netbios", 143: "imap", 443: "https", 445: "smb",
     993: "imaps", 995: "pop3s", 1723: "pptp", 3306: "mysql",
     3389: "rdp", 5432: "postgresql", 5900: "vnc", 6379: "redis",
-    8080: "http-proxy", 8443: "https-alt", 9090: "http-alt",
-    27017: "mongodb", 5000: "http-alt",
+    8000: "http", 8008: "http", 8080: "http-proxy", 8088: "http",
+    8443: "https-alt", 8888: "http", 9090: "http-alt",
+    27017: "mongodb", 3000: "http-alt", 5000: "http-alt",
+    7000: "http-alt", 9000: "http-alt",
 }
 
 TOP_PORTS: list[int] = sorted(_COMMON_SERVICES.keys() | {
@@ -60,7 +69,7 @@ async def _scan_one_port(target: str, port: int, timeout: float = 2.0) -> PortRe
         banner = ""
 
         probe_template = _BANNER_PROBES.get(port)
-        if probe_template and probe_template != b"":
+        if probe_template is not None and probe_template != b"":
             try:
                 probe = (
                     probe_template.replace(b"{target}", target.encode())
@@ -73,6 +82,20 @@ async def _scan_one_port(target: str, port: int, timeout: float = 2.0) -> PortRe
                     writer.read(1024), timeout=1.5,
                 )
                 banner = banner_bytes.decode("utf-8", errors="replace")[:200]
+            except Exception:
+                pass
+        elif service == "unknown":
+            # 通用回退：对未知服务发一次 HTTP 探测，响应为 HTTP 则归类为 http
+            try:
+                probe = _HTTP_PROBE.replace(b"{target}", target.encode())
+                writer.write(probe)
+                await writer.drain()
+                banner_bytes = await asyncio.wait_for(
+                    writer.read(1024), timeout=1.5,
+                )
+                banner = banner_bytes.decode("utf-8", errors="replace")[:200]
+                if banner.startswith("HTTP/"):
+                    service = "http"
             except Exception:
                 pass
 

@@ -8,10 +8,10 @@ import json
 import tempfile
 from pathlib import Path
 
-_NUCLEI_PATH = "E:/PTtools/nuclei.exe"
+_NUCLEI_PATH = "C:/PTools/nuclei.exe"
 
-# Pass 1: technology fingerprint tags
-_TECH_TAGS = "tech-detect"
+# Pass 1: technology fingerprinting (single Wappalyzer-style template)
+_TECH_IDS = "tech-detect"
 
 # Pass 2: vulnerability tags (P0 + P1 + config + CVE)
 _VULN_TAGS = ",".join([
@@ -43,20 +43,23 @@ _ALL_CATEGORIES = {
 # ---------------------------------------------------------------------------
 async def scan_fingerprints(targets: list[str], timeout: float = 120.0) -> list[dict]:
     """Pass 1: detect frameworks, services, and component versions."""
-    raw = await _run_nuclei(targets, tags=_TECH_TAGS, severity="info,low,medium,high,critical",
+    raw = await _run_nuclei(targets, ids=_TECH_IDS, severity="info,low,medium,high,critical",
                             timeout=timeout, concurrency=15)
     fingerprints: list[dict] = []
     for entry in raw:
-        extracted = (entry.get("info", {}) or {}).get("metadata", {}).get("product", "")
+        info = entry.get("info", {}) or {}
+        extracted = (
+            entry.get("matcher-name", "")
+            or info.get("metadata", {}).get("product", "")
+            or entry.get("extracted-results", [])
+        )
         fingerprints.append({
             "template_id": entry.get("template-id", ""),
             "host": entry.get("host", entry.get("matched-at", "")),
             "matched_at": entry.get("matched-at", ""),
-            "name": (entry.get("info", {}) or {}).get("name", ""),
-            "severity": _SEVERITY_MAP.get(
-                (entry.get("info", {}) or {}).get("severity", "info"), "info",
-            ),
-            "extracted": extracted or entry.get("extracted-results", []),
+            "name": info.get("name", ""),
+            "severity": _SEVERITY_MAP.get(info.get("severity", "info"), "info"),
+            "extracted": extracted,
         })
     return fingerprints[:50]
 
@@ -65,13 +68,16 @@ async def scan_vulnerabilities(
     targets: list[str],
     fingerprints: list[dict] | None = None,
     timeout: float = 300.0,
+    tags: str | None = None,
 ) -> list[dict]:
     """Pass 2: run CVE + vuln templates.
 
     *fingerprints* are passed as context (consumed by Planner in phase 4-5,
     but also used here to optionally scope CVE templates to detected products).
+    *tags* scopes the nuclei -tags selection (planner-driven precision strike);
+    defaults to the full vulnerability tag set.
     """
-    raw = await _run_nuclei(targets, tags=_VULN_TAGS,
+    raw = await _run_nuclei(targets, tags=tags or _VULN_TAGS,
                             severity="critical,high,medium,low",
                             timeout=timeout, concurrency=10)
     results: list[dict] = []
@@ -97,14 +103,18 @@ async def scan(
 # ---------------------------------------------------------------------------
 async def _run_nuclei(
     targets: list[str],
-    tags: str,
-    severity: str,
-    timeout: float,
-    concurrency: int,
+    tags: str | None = None,
+    ids: str | None = None,
+    severity: str = "info,low,medium,high,critical",
+    timeout: float = 120.0,
+    concurrency: int = 15,
 ) -> list[dict]:
     nuclei_path = Path(_NUCLEI_PATH)
     if not nuclei_path.exists():
         return []
+
+    if tags is None and ids is None:
+        raise ValueError("_run_nuclei requires tags or ids")
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".txt", delete=False, encoding="utf-8",
@@ -112,16 +122,23 @@ async def _run_nuclei(
         f.write("\n".join(targets))
         targets_file = f.name
 
+    cmd = [
+        str(nuclei_path),
+        "-list", targets_file,
+        "-severity", severity,
+        "-jsonl", "-stats",
+        "-no-mhe", "-no-interactsh",
+        "-timeout", str(int(timeout)),
+        "-concurrency", str(concurrency),
+    ]
+    if ids is not None:
+        cmd += ["-id", ids]
+    else:
+        cmd += ["-tags", tags]
+
     try:
         proc = await asyncio.create_subprocess_exec(
-            str(nuclei_path),
-            "-list", targets_file,
-            "-tags", tags,
-            "-severity", severity,
-            "-jsonl", "-stats",
-            "-no-mhe", "-no-interactsh",
-            "-timeout", str(int(timeout)),
-            "-concurrency", str(concurrency),
+            *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

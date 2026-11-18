@@ -8,7 +8,7 @@ import re
 import tempfile
 from pathlib import Path
 
-_SQLMAP_PATH = "E:/PTtools/sqlmap.exe"
+_SQLMAP_PATH = "C:/PTools/sqlmap.exe"
 
 
 async def verify_sqli(url: str, timeout: float = 600.0) -> dict | None:

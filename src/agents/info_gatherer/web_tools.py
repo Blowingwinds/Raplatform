@@ -7,7 +7,7 @@ import json
 import tempfile
 from pathlib import Path
 
-_FFUF_PATH = "E:/PTtools/ffuf.exe"
+_FFUF_PATH = "C:/PTools/ffuf.exe"
 
 _WORDLIST: list[str] = [
     "admin", "api", "login", "robots.txt", "sitemap.xml",
@@ -22,6 +22,12 @@ _WORDLIST: list[str] = [
     "wp-content", "wp-includes", "wp-json/",
     "phpmyadmin", "jenkins", "sonarqube",
     "api/v1", "api/v2", "api/docs",
+    "products", "product", "items", "item", "detail", "view",
+    "search", "comments", "comment", "news", "articles",
+    "users", "user", "profile", "account", "register", "reset",
+    "cart", "checkout", "orders", "upload", "download",
+    "settings", "edit", "delete", "list", "page", "index", "home",
+    "exec", "shell", "cmd",
 ]
 
 

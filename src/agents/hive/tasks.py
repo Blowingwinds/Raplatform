@@ -131,9 +131,13 @@ def make_info_tasks(
             f"1. scan_ports(target='{target}') — discover open TCP ports and services\n"
             f"2. resolve_dns(hostname='{target}') — resolve DNS records\n"
             f"3. enumerate_subdomains(domain='{target}') — discover subdomains\n"
-            f"4. If HTTP services found: discover_endpoints(base_url='http://{target}')\n\n"
-            f"Report all findings as structured observations."
+            f"4. If HTTP services found: discover_endpoints(base_url='http://{target}')\n"
         )
+        # 常见 HTTP 端口兜底探测（80 之外的常用 Web 端口）
+        for port in (443, 8000, 8008, 8080, 8088, 8443, 8888, 3000, 5000, 7000, 9000):
+            scheme = "https" if port == 443 else "http"
+            desc += f"   discover_endpoints(base_url='{scheme}://{target}:{port}')\n"
+        desc += "Report all findings as structured observations."
         tasks.append(Task(
             description=desc,
             expected_output="JSON with observations list including service.exposed, "
@@ -166,11 +170,23 @@ def make_fingerprint_tasks(
         urls = [f"http{'s' if p == 443 else ''}://{host}:{p}" for p in http_ports[:3]]
 
         svc_descs = ', '.join(f"{s['service_name']}:{s['port']}" for s in svc_list)
-        desc = (
-            f"Fingerprint technology on target: {host}\n\n"
-            f"Discovered services: {svc_descs}\n\n"
-            f"Run scan_fingerprints(target='{host}') to identify frameworks, "
-            f"languages, web servers, and runtime versions.\n"
+        if urls:
+            desc = (
+                f"Fingerprint technology on target: {host}\n\n"
+                f"Discovered services: {svc_descs}\n\n"
+                f"Run scan_fingerprints(target='{urls[0]}') to identify frameworks, "
+                f"languages, web servers, and runtime versions.\n"
+            )
+            for extra in urls[1:3]:
+                desc += f"Run scan_fingerprints(target='{extra}') for this service.\n"
+        else:
+            desc = (
+                f"Fingerprint technology on target: {host}\n\n"
+                f"Discovered services: {svc_descs}\n\n"
+                f"Run scan_fingerprints(target='{host}') to identify frameworks, "
+                f"languages, web servers, and runtime versions.\n"
+            )
+        desc += (
             f"Expected fingerprints help determine which CVEs to check later.\n\n"
             f"If web endpoints found: use discover_endpoints on {urls if urls else host}"
         )
@@ -234,12 +250,13 @@ def make_vuln_tasks(
                     continue
                 seen_targets.add(target)
                 actions = ", ".join(step.get("actions", []))
-                tool = step.get("tool", "nuclei")
+                probe_url = _probe_url_for(target, step.get("actions", []), services)
                 desc = (
                     f"Test web vulnerabilities on: {target}\n"
                     f"Reasoning: {step.get('reasoning', '')}\n"
                     f"Actions: {actions}\n"
-                    f"Use {tool} to detect these vulnerability types. "
+                    f"Run scan_vulnerabilities(target='{probe_url}') to detect "
+                    f"these vulnerability types.\n"
                     f"Report each finding as a vulnerability.detected observation."
                 )
                 tasks.append(Task(
@@ -323,6 +340,38 @@ def make_exploit_tasks(
 
 
 # ── helpers ────────────────────────────────────────────────────────────
+
+def _probe_url_for(target: str, actions: list[str], services: list[dict]) -> str:
+    """Build a probe URL carrying a test parameter so param-based templates fire.
+
+    ffuf-discovered endpoints have no query string, but sqli/xss templates need
+    a parameter value to test.  Attach an educated guess based on the path.
+    Service-based planner steps carry a bare host — rebuild the URL with port.
+    """
+    if "?" in target:
+        return target
+
+    # Service-based steps: bare host → reconstruct http(s)://host:port
+    if "://" not in target:
+        for svc in services:
+            if svc.get("asset_ref") == target:
+                name = svc.get("service_name", "").lower()
+                if name in ("http", "https", "http-alt", "http-proxy", "https-alt"):
+                    scheme = "https" if name in ("https", "https-alt") else "http"
+                    target = f"{scheme}://{target}:{svc.get('port')}"
+                break
+
+    path = target.rstrip("/").lower()
+    if "search" in path or "find" in path or "query" in path:
+        return f"{target}?q=test"
+    if "login" in path or "auth" in path or "signin" in path:
+        return f"{target}?username=admin&password=admin123"
+    if "redirect" in path or "goto" in path or "next" in path:
+        return f"{target}?url=https://example.com"
+    if "upload" in path:
+        return target  # upload checks are POST-driven; keep path as-is
+    return f"{target}?id=1"
+
 
 def _run_planner(planner_func, **kwargs) -> dict[str, Any]:
     """Run an async planner function synchronously."""
