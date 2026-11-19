@@ -19,6 +19,7 @@ from pathlib import Path
 _project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_project_root))
 
+from src.agents.capabilities import register_default_capabilities
 from src.agents.hive import FakeCrewRunner, HiveOrchestrator, HivePhase
 from src.blackboard.service import BlackboardService
 from src.domain.storage import SQLiteStore
@@ -44,17 +45,41 @@ def cmd_scan(args: argparse.Namespace) -> None:
     print(f"Targets : {', '.join(targets)}")
     print(f"Rounds  : {args.rounds}")
     print(f"Project : {args.project}")
+    print(f"Mode    : {'demo (auto-approve)' if not args.no_demo else 'HITL (approval required)'}")
     print("-" * 50)
 
     summary = orch.run(seed_targets=targets)
 
     print("-" * 50)
-    print(f"Phase   : {summary.final_phase.value}")
+    print(f"Status  : {summary.final_phase.value}")
     print(f"Rounds  : {summary.rounds}")
+    print(f"Session : {summary.session_status}")
     print(f"Facts   : {summary.fact_count}")
     print(f"Vulns   : {summary.vuln_count} ({summary.verified_count} verified)")
     if summary.truncated:
         print("(max rounds reached)")
+
+    # Phase 7 metrics
+    print()
+    print("── Attack Chain Metrics ──")
+    dispatched = summary.actions_dispatched
+    succeeded = summary.actions_succeeded
+    rate = summary.success_rate
+    print(f"  Actions: {dispatched} dispatched, {succeeded} succeeded "
+          f"({summary.actions_failed} failed, {summary.actions_blocked} blocked)")
+    print(f"  Success rate: {rate:.1%}")
+    print(f"  Lease conflicts: {summary.lease_conflicts}")
+    print(f"  HITL requests: {summary.hitle_requests}")
+    print(f"  Events processed: {summary.events_processed}")
+
+    # Show PTT progress if available
+    for entry in summary.round_log:
+        if "progress" in entry:
+            p = entry["progress"]
+            print(f"  PTT: total={p.get('total', 0)} ready={p.get('ready', 0)} "
+                  f"ok={p.get('succeeded', 0)} fail={p.get('failed', 0)} "
+                  f"blocked={p.get('blocked', 0)}")
+            break  # show latest only
 
     # Show facts
     bb = BlackboardService(store)
@@ -84,8 +109,121 @@ def cmd_scan(args: argparse.Namespace) -> None:
     store.close()
 
 
+def cmd_approve(args: argparse.Namespace) -> None:
+    """Approve a pending HITL approval request."""
+    from src.domain.storage import SQLiteStore
+    from src.policy.approval import ApprovalGate
+
+    store = SQLiteStore(args.db)
+    gate = ApprovalGate(store, demo_mode=False)
+    try:
+        req = gate.approve(args.request_id, decided_by=args.by or "cli")
+        print(f"Approved: {req.request_id}")
+        print(f"  Action : {req.action_id}")
+        print(f"  State  : {req.state.value}")
+    except Exception as exc:
+        print(f"Error: {exc}")
+        store.close()
+        sys.exit(1)
+    store.close()
+
+
+def cmd_reject(args: argparse.Namespace) -> None:
+    """Reject a pending HITL approval request."""
+    from src.domain.storage import SQLiteStore
+    from src.policy.approval import ApprovalGate
+
+    store = SQLiteStore(args.db)
+    gate = ApprovalGate(store, demo_mode=False)
+    try:
+        req = gate.reject(args.request_id, decided_by=args.by or "cli",
+                          reason=args.reason or "")
+        print(f"Rejected: {req.request_id}")
+        print(f"  Action : {req.action_id}")
+        print(f"  State  : {req.state.value}")
+    except Exception as exc:
+        print(f"Error: {exc}")
+        store.close()
+        sys.exit(1)
+    store.close()
+
+
+def cmd_pending(args: argparse.Namespace) -> None:
+    """List pending HITL approval requests."""
+    from src.policy.approval import ApprovalGate
+
+    store = SQLiteStore(args.db)
+    gate = ApprovalGate(store, demo_mode=False)
+    pending = gate.pending_for(args.project)
+    if not pending:
+        print("No pending approval requests.")
+    else:
+        print(f"Pending approvals for {args.project}: {len(pending)}")
+        print("-" * 50)
+        for req in pending:
+            print(f"  [{req.request_id}]")
+            print(f"    Action     : {req.action_id}")
+            print(f"    Capability : {req.capability_id}")
+            print(f"    Risk       : {req.risk_level.value}")
+            print(f"    Targets    : {', '.join(req.resource_refs) if req.resource_refs else 'n/a'}")
+            print(f"    Created    : {req.created_at.isoformat()}")
+            print(f"    Reason     : {req.reason}")
+            print()
+            print(f"    Approve: python -m src approve {req.request_id} --db {args.db}")
+            print(f"    Reject : python -m src reject {req.request_id} --db {args.db}")
+            print("-" * 50)
+    store.close()
+
+
+def cmd_tree(args: argparse.Namespace) -> None:
+    """Show the PTT tree from the last run."""
+    store = SQLiteStore(args.db)
+    tree_data = store.get_ptt_tree(args.project)
+    if tree_data is None:
+        print(f"No PTT tree found for project '{args.project}'.")
+        print(f"Run a scan first: python -m src scan --db {args.db}")
+        store.close()
+        return
+
+    from src.planner.ptt_schema import PTTTree
+    tree = PTTTree.from_persistable(tree_data)
+    summary = tree.summary()
+    progress = tree.progress()
+
+    print("=" * 60)
+    print(f"  PTT TREE: {summary['goal']}")
+    print("=" * 60)
+    print(f"  Plan ID     : {summary['plan_id']}")
+    print(f"  Generated by: {summary['generated_by']}")
+    print(f"  Tactics     : {summary['tactics']}")
+    print(f"  Techniques  : {summary['techniques']}")
+    print(f"  Actions     : {summary['actions']}")
+    print("-" * 60)
+    print(f"  Progress: "
+          f"planned={progress['planned']} ready={progress['ready']} "
+          f"running={progress['running']} succeeded={progress['succeeded']} "
+          f"failed={progress['failed']} blocked={progress['blocked']} "
+          f"skipped={progress['skipped']}")
+
+    # Show per-action status
+    print("\n  Action Status:")
+    for action in tree._all_actions():
+        status = tree.node_states.get(action.action_id, "unknown")
+        marker = {
+            "ready": "→",
+            "running": "⚡",
+            "succeeded": "✓",
+            "failed": "✗",
+            "blocked": "⊘",
+            "skipped": "⏭",
+        }.get(str(status.value) if hasattr(status, 'value') else str(status), " ")
+        print(f"    [{marker}] {action.action_id} ({status}): {action.name}")
+
+    store.close()
+
+
 def cmd_status(args: argparse.Namespace) -> None:
-    """Show blackboard state from a previous run."""
+    """Show blackboard state with agent/evidence traceability."""
     db_path = args.db
     if not Path(db_path).exists() and db_path != ":memory:":
         print(f"Error: database not found: {db_path}")
@@ -96,10 +234,10 @@ def cmd_status(args: argparse.Namespace) -> None:
     facts = bb.snapshot(args.project)
     events = bb.events_since(args.project)
 
-    print(f"Project  : {args.project}")
-    print(f"Facts    : {len(facts)}")
-    print(f"Events   : {len(events)}")
-    print("-" * 40)
+    print(f"Project   : {args.project}")
+    print(f"Facts     : {len(facts)}")
+    print(f"Events    : {len(events)}")
+    print("-" * 60)
 
     if not facts:
         print("No facts on blackboard.")
@@ -114,13 +252,19 @@ def cmd_status(args: argparse.Namespace) -> None:
         print(f"\n[{ftype}] ({len(items)})")
         for item in items:
             verified = " [V]" if item.data.get("verified") else ""
-            print(f"  {item.asset_ref}{verified} (conf={item.confidence:.0%})")
+            agent = item.source_agent or "?"
+            ev_ref = item.evidence_ref[:20] + "…" if item.evidence_ref else "?"
+            print(f"  {item.asset_ref}{verified} (conf={item.confidence:.0%}) "
+                  f"← agent:{agent} ev:{ev_ref}")
 
     store.close()
 
 
 def cmd_report(args: argparse.Namespace) -> None:
-    """Generate a summary report from blackboard facts."""
+    """Generate a full Markdown (and optionally HTML) penetration test report."""
+    from src.blackboard.topology import TopologyService
+    from src.reporting.generator import generate_markdown, wrap_html
+
     db_path = args.db
     if not Path(db_path).exists() and db_path != ":memory:":
         print(f"Error: database not found: {db_path}")
@@ -128,49 +272,141 @@ def cmd_report(args: argparse.Namespace) -> None:
 
     store = SQLiteStore(db_path)
     bb = BlackboardService(store)
-    facts = bb.snapshot(args.project)
+    topology = TopologyService(bb)
 
-    assets = [f for f in facts if f.fact_type == "asset.discovered"]
-    services = [f for f in facts if f.fact_type == "service.exposed"]
-    fingerprints = [f for f in facts if f.fact_type == "fingerprint.detected"]
-    vulns = [f for f in facts if f.fact_type == "vulnerability.detected"]
-    verified = [v for v in vulns if v.data.get("verified")]
+    # Load PTT tree if available
+    tree_data = store.get_ptt_tree(args.project)
 
-    print("=" * 50)
-    print("  PENETRATION TEST REPORT")
-    print("=" * 50)
-    print(f"  Project    : {args.project}")
-    print(f"  Assets     : {len(assets)}")
-    print(f"  Services   : {len(services)}")
-    print(f"  Tech Stack : {len(fingerprints)}")
-    print(f"  Vulns      : {len(vulns)} ({len(verified)} verified)")
-    print("-" * 50)
+    md = generate_markdown(
+        args.project, bb,
+        topology=topology,
+        tree_data=tree_data,
+    )
 
-    if services:
-        print("\n[SERVICES]")
-        for s in services:
-            print(f"  {s.asset_ref}:{s.data.get('port')} → {s.data.get('service_name')}"
-                  + (f" ({s.data.get('banner', '')[:60]})" if s.data.get('banner') else ""))
+    if args.format == "html":
+        html = wrap_html(md, title=f"Penetration Test Report — {args.project}")
+        if args.output:
+            Path(args.output).write_text(html, encoding="utf-8")
+            print(f"HTML report written to {args.output}")
+        else:
+            md_path = args.db.replace(".db", "_report.html")
+            Path(md_path).write_text(html, encoding="utf-8")
+            print(f"HTML report written to {md_path}")
+    else:
+        if args.output:
+            Path(args.output).write_text(md, encoding="utf-8")
+            print(f"Markdown report written to {args.output}")
+        else:
+            md_path = args.db.replace(".db", "_report.md")
+            Path(md_path).write_text(md, encoding="utf-8")
+            print(f"Markdown report written to {md_path}")
 
-    if fingerprints:
-        print("\n[TECHNOLOGY]")
-        for fp in fingerprints:
-            print(f"  {fp.asset_ref}: {fp.data.get('name')} {fp.data.get('extracted', '')}")
+    store.close()
 
-    if vulns:
-        print("\n[VULNERABILITIES]")
-        for v in vulns:
-            status = "[VERIFIED]" if v.data.get("verified") else "[PENDING]"
-            print(f"  {status} {v.data.get('name', '?')}")
-            print(f"    Target: {v.asset_ref}")
-            print(f"    Severity: {v.data.get('severity', '?')}")
-            print(f"    Category: {v.data.get('category', '?')}")
-            if v.data.get("description"):
-                print(f"    {v.data.get('description')[:120]}")
 
-    if not services and not vulns:
-        print("\n  No findings. Run a scan first:")
-        print(f"    python -m src scan --target <target> --db {args.db}")
+def cmd_demo(args: argparse.Namespace) -> None:
+    """Run the complete demo: plan → scan → report → tree."""
+    print("=" * 60)
+    print("  RAPLATFORM DEMO — Full Penetration Test Lifecycle")
+    print("=" * 60)
+    print()
+
+    # Phase 1: Plan
+    print("── Phase 1: PTT Plan Generation ──")
+    plan_args = argparse.Namespace(
+        goal=args.goal, project=args.project, scope=args.scope,
+        db=args.db, output=None,
+    )
+    cmd_plan(plan_args)
+
+    print()
+
+    # Phase 2: Scan
+    print("── Phase 2: Hive Scan Execution ──")
+    scan_args = argparse.Namespace(
+        target=args.target, project=args.project, scope=args.scope,
+        session=args.session, rounds=args.rounds, db=args.db,
+        verbose=args.verbose, no_demo=args.no_demo,
+    )
+    cmd_scan(scan_args)
+
+    print()
+
+    # Phase 3: Status
+    print("── Phase 3: Blackboard Status ──")
+    status_args = argparse.Namespace(project=args.project, db=args.db)
+    cmd_status(status_args)
+
+    print()
+
+    # Phase 4: Report
+    print("── Phase 4: Report Generation ──")
+    report_args = argparse.Namespace(
+        project=args.project, db=args.db,
+        format="md", output=None,
+    )
+    cmd_report(report_args)
+
+    print()
+
+    # Phase 5: PTT Tree
+    print("── Phase 5: PTT Tree Status ──")
+    tree_args = argparse.Namespace(project=args.project, db=args.db)
+    cmd_tree(tree_args)
+
+    print()
+    print("=" * 60)
+    print("  DEMO COMPLETE — All phases executed successfully")
+    print("=" * 60)
+
+
+def cmd_trace(args: argparse.Namespace) -> None:
+    """Trace a fact back to its source agent and raw evidence."""
+    from src.blackboard.service import BlackboardService
+    from src.reporting.generator import trace_fact_chain
+
+    db_path = args.db
+    if not Path(db_path).exists() and db_path != ":memory:":
+        print(f"Error: database not found: {db_path}")
+        sys.exit(1)
+
+    store = SQLiteStore(db_path)
+    bb = BlackboardService(store)
+    chain = trace_fact_chain(args.fact_id, bb)
+
+    if chain is None:
+        print(f"Fact '{args.fact_id}' not found.")
+        store.close()
+        return
+
+    print("=" * 60)
+    print("  EVIDENCE TRACE")
+    print("=" * 60)
+    print(f"  Fact ID      : {chain['fact']['fact_id']}")
+    print(f"  Fact Type    : {chain['fact']['fact_type']}")
+    print(f"  Asset        : {chain['fact']['asset_ref']}")
+    print(f"  Confidence   : {chain['fact']['confidence']}")
+    print(f"  Version      : {chain['fact']['version']}")
+    print(f"  State        : {chain['fact']['state']}")
+    print("-" * 60)
+    print(f"  Source Agent : {chain['agent_id']}")
+    print(f"  Session      : {chain['session_id']}")
+    if chain['session']:
+        print(f"  Session Status: {chain['session']['status']}")
+    print("-" * 60)
+    print("  Evidence:")
+    if chain['evidence']:
+        ev = chain['evidence']
+        print(f"    Evidence ID : {ev.get('evidence_id', '?')}")
+        print(f"    Agent       : {ev.get('agent_id', '?')}")
+        print(f"    Kind        : {ev.get('kind', '?')}")
+        print(f"    Task        : {ev.get('task_id', '?')}")
+        print(f"    Captured    : {ev.get('captured_at', '?')}")
+        payload = ev.get('raw_payload', {})
+        print(f"    Payload keys: {list(payload.keys()) if isinstance(payload, dict) else 'n/a'}")
+    else:
+        print("    (evidence not found in storage)")
+    print("=" * 60)
 
     store.close()
 
@@ -200,27 +436,8 @@ def cmd_plan(args: argparse.Namespace) -> None:
     registry = AgentRegistry(store)
 
     # Register default capabilities for technique matching
-    _DEFAULT_CAPS = [
-        ("info-gatherer", "Information Gatherer",
-         ["T1046", "T1592", "T1590", "T1595"], ["ip", "domain", "url", "hostname"], "low"),
-        ("framework-vuln", "Framework Vuln",
-         ["T1190", "T1595", "T1210"], ["url", "service", "hostname"], "medium"),
-        ("web-attack", "Web Attack",
-         ["T1190", "T1595", "T1059"], ["url", "service", "endpoint"], "high"),
-        ("component-vuln", "Component Vuln",
-         ["T1190", "T1595", "T1210"], ["url", "service", "component"], "medium"),
-        ("exploit-verifier", "Exploit Verifier",
-         ["T1190", "T1059", "T1210"], ["url", "endpoint", "service"], "high"),
-    ]
-    for cid, name, techs, targets, risk in _DEFAULT_CAPS:
-        if registry.get(cid) is None:
-            registry.register(AgentCapability(
-                capability_id=cid, name=name,
-                techniques=techs, target_types=targets,
-                input_schema=f"{cid}_input.schema.json",
-                output_schema=f"{cid}_output.schema.json",
-                risk_level=RiskLevel(risk),
-            ))
+    register_default_capabilities(registry)
+
     planner = Planner(store)
 
     try:
@@ -316,11 +533,74 @@ def main() -> None:
                           help="Database path")
 
     # ── report ──
-    p_report = sub.add_parser("report", help="Generate summary report")
+    p_report = sub.add_parser("report", help="Generate Markdown/HTML report")
     p_report.add_argument("--project", default="default",
                           help="Project ID")
     p_report.add_argument("--db", default="raplatform.db",
                           help="Database path")
+    p_report.add_argument("--format", default="md", choices=["md", "html"],
+                          help="Report format (default: md)")
+    p_report.add_argument("--output", "-o", default=None,
+                          help="Output file path (default: <db>_report.md)")
+
+    # ── approve ──
+    p_approve = sub.add_parser("approve", help="Approve a pending HITL request")
+    p_approve.add_argument("request_id", help="Approval request ID")
+    p_approve.add_argument("--db", default="raplatform.db",
+                           help="Database path")
+    p_approve.add_argument("--by", default=None,
+                           help="Who approved (default: cli)")
+
+    # ── reject ──
+    p_reject = sub.add_parser("reject", help="Reject a pending HITL request")
+    p_reject.add_argument("request_id", help="Approval request ID")
+    p_reject.add_argument("--db", default="raplatform.db",
+                          help="Database path")
+    p_reject.add_argument("--by", default=None,
+                          help="Who rejected (default: cli)")
+    p_reject.add_argument("--reason", default="",
+                          help="Rejection reason")
+
+    # ── pending ──
+    p_pending = sub.add_parser("pending", help="List pending HITL requests")
+    p_pending.add_argument("--project", default="default",
+                           help="Project ID")
+    p_pending.add_argument("--db", default="raplatform.db",
+                           help="Database path")
+
+    # ── tree ──
+    p_tree = sub.add_parser("tree", help="Show PTT tree status")
+    p_tree.add_argument("--project", default="default",
+                        help="Project ID")
+    p_tree.add_argument("--db", default="raplatform.db",
+                        help="Database path")
+
+    # ── demo ──
+    p_demo = sub.add_parser("demo", help="Run full demo (plan → scan → report → tree)")
+    p_demo.add_argument("--goal", default="发现授权网段的资产和服务",
+                        help="NL goal for PTT plan generation")
+    p_demo.add_argument("--target", "-t", default="127.0.0.1",
+                        help="Target IP or hostname")
+    p_demo.add_argument("--project", default="demo",
+                        help="Project ID")
+    p_demo.add_argument("--scope", default="demo-scope",
+                        help="Scope ID")
+    p_demo.add_argument("--session", default="demo-session",
+                        help="Session ID")
+    p_demo.add_argument("--rounds", type=int, default=6,
+                        help="Max hive rounds")
+    p_demo.add_argument("--db", default="demo.db",
+                        help="Database path")
+    p_demo.add_argument("--verbose", "-v", action="store_true",
+                        help="Verbose output")
+    p_demo.add_argument("--no-demo", action="store_true",
+                        help="Require HITL approval")
+
+    # ── trace ──
+    p_trace = sub.add_parser("trace", help="Trace a fact back to source agent + evidence")
+    p_trace.add_argument("fact_id", help="Fact ID to trace")
+    p_trace.add_argument("--db", default="raplatform.db",
+                         help="Database path")
 
     args = parser.parse_args()
 
@@ -332,6 +612,18 @@ def main() -> None:
         cmd_status(args)
     elif args.command == "report":
         cmd_report(args)
+    elif args.command == "approve":
+        cmd_approve(args)
+    elif args.command == "reject":
+        cmd_reject(args)
+    elif args.command == "pending":
+        cmd_pending(args)
+    elif args.command == "tree":
+        cmd_tree(args)
+    elif args.command == "demo":
+        cmd_demo(args)
+    elif args.command == "trace":
+        cmd_trace(args)
 
 
 if __name__ == "__main__":

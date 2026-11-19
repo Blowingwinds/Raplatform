@@ -1,0 +1,1 @@
+"""Reporting module — Markdown + HTML report generation."""

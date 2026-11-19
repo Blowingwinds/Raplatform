@@ -70,9 +70,9 @@ class TestPlannerGenerate:
         tree = planner.generate("发现授权网段的资产和服务", scope, registry)
         assert tree.plan.goal == "发现授权网段的资产和服务"
         assert len(tree.plan.tactics) > 0
-        # All actions start PLANNED
-        planned = tree.planned_actions()
-        assert len(planned) > 0
+        # Root actions (no dependencies) become READY after recompute_ready()
+        ready = tree.ready_actions()
+        assert len(ready) > 0
 
     def test_generate_web_vuln_scan(self, planner, scope, registry):
         tree = planner.generate("扫描 Web 应用漏洞", scope, registry)
@@ -88,8 +88,8 @@ class TestPlannerGenerate:
     def test_generate_returns_live_tree(self, planner, scope, registry):
         tree = planner.generate("发现资产和服务", scope, registry)
         assert tree.progress()["total"] > 0
-        # All start PLANNED by default
-        assert tree.progress()["total"] == tree.progress()["planned"]
+        # Root actions (no dependencies) become READY after recompute_ready()
+        assert tree.progress()["total"] == tree.progress()["ready"]
 
     def test_generate_no_match_raises(self, planner, scope, registry):
         with pytest.raises(PlanRejection, match="No mock scenario"):

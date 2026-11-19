@@ -9,6 +9,7 @@ from typing import TypeVar
 
 from .models import (
     AgentCapability,
+    ApprovalRequest,
     AuditEvent,
     BlackboardEvent,
     BlackboardFact,
@@ -74,6 +75,14 @@ class SQLiteStore:
             );
             CREATE TABLE IF NOT EXISTS audit_events (
                 audit_id TEXT PRIMARY KEY,
+                payload TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS approval_requests (
+                request_id TEXT PRIMARY KEY,
+                payload TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS ptt_trees (
+                project_id TEXT PRIMARY KEY,
                 payload TEXT NOT NULL
             );
             """
@@ -216,6 +225,103 @@ class SQLiteStore:
 
     def get_audit_event(self, audit_id: str) -> AuditEvent | None:
         return self._get("audit_events", "audit_id", audit_id, AuditEvent)
+
+    # ── lease query methods ─────────────────────────────────────────────────
+
+    def list_leases_for_resource(self, project_id: str, resource_ref: str) -> list[Lease]:
+        rows = self._connection.execute("SELECT payload FROM leases").fetchall()
+        return [
+            lease
+            for row in rows
+            if (lease := Lease.model_validate(json.loads(row["payload"]))).project_id == project_id
+            and lease.resource_ref == resource_ref
+        ]
+
+    def list_leases_for_session(self, session_id: str) -> list[Lease]:
+        rows = self._connection.execute("SELECT payload FROM leases").fetchall()
+        return [
+            lease
+            for row in rows
+            if (lease := Lease.model_validate(json.loads(row["payload"]))).holder_session_id == session_id
+        ]
+
+    def delete_lease(self, lease_id: str) -> None:
+        cursor = self._connection.execute(
+            "DELETE FROM leases WHERE lease_id = ?", (lease_id,)
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"lease {lease_id} does not exist")
+        self._connection.commit()
+
+    def update_lease(self, lease: Lease) -> None:
+        cursor = self._connection.execute(
+            "UPDATE leases SET payload = ? WHERE lease_id = ?",
+            (json.dumps(lease.model_dump(mode="json"), ensure_ascii=False), lease.lease_id),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError(f"lease {lease.lease_id} does not exist")
+        self._connection.commit()
+
+    def list_leases(self, project_id: str) -> list[Lease]:
+        rows = self._connection.execute("SELECT payload FROM leases").fetchall()
+        return [
+            lease
+            for row in rows
+            if (lease := Lease.model_validate(json.loads(row["payload"]))).project_id == project_id
+        ]
+
+    # ── approval methods ───────────────────────────────────────────────────
+
+    def save_approval(self, request: ApprovalRequest) -> None:
+        self._save("approval_requests", "request_id", request.request_id,
+                    request.model_dump(mode="json"))
+
+    def get_approval(self, request_id: str) -> ApprovalRequest | None:
+        return self._get("approval_requests", "request_id", request_id, ApprovalRequest)
+
+    def list_pending_approvals(self, project_id: str) -> list[ApprovalRequest]:
+        rows = self._connection.execute("SELECT payload FROM approval_requests").fetchall()
+        return [
+            req
+            for row in rows
+            if (req := ApprovalRequest.model_validate(json.loads(row["payload"]))).project_id == project_id
+            and req.state.value == "pending"
+        ]
+
+    def update_approval(self, request: ApprovalRequest) -> None:
+        cursor = self._connection.execute(
+            "UPDATE approval_requests SET payload = ? WHERE request_id = ?",
+            (json.dumps(request.model_dump(mode="json"), ensure_ascii=False), request.request_id),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError(f"approval {request.request_id} does not exist")
+        self._connection.commit()
+
+    def update_session(self, session: ExecutionSession) -> None:
+        cursor = self._connection.execute(
+            "UPDATE sessions SET payload = ? WHERE session_id = ?",
+            (json.dumps(session.model_dump(mode="json"), ensure_ascii=False), session.session_id),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError(f"session {session.session_id} does not exist")
+        self._connection.commit()
+
+    # ── ptt tree persistence ────────────────────────────────────────────────
+
+    def save_ptt_tree(self, project_id: str, tree_payload: dict) -> None:
+        self._connection.execute(
+            "INSERT OR REPLACE INTO ptt_trees (project_id, payload) VALUES (?, ?)",
+            (project_id, json.dumps(tree_payload, ensure_ascii=False)),
+        )
+        self._connection.commit()
+
+    def get_ptt_tree(self, project_id: str) -> dict | None:
+        row = self._connection.execute(
+            "SELECT payload FROM ptt_trees WHERE project_id = ?", (project_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        return json.loads(row["payload"])
 
     def close(self) -> None:
         self._connection.close()

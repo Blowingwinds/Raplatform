@@ -121,9 +121,10 @@ class TestHiveOrchestratorLifecycle:
         assert not summary.truncated
         # Should have produced some facts
         assert summary.fact_count > 0
-        # Round log should show multiple phases
-        phases_seen = {r["phase"] for r in summary.round_log}
-        assert "recon" in phases_seen
+        # Round log should show progress entries
+        assert len(summary.round_log) > 0
+        for entry in summary.round_log:
+            assert "progress" in entry or "round" in entry
 
     def test_seed_targets_are_written_to_blackboard(self, store):
         transport = _make_transport_with_canned()

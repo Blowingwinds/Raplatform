@@ -46,6 +46,21 @@ class FactState(StrEnum):
     CONFLICTED = "conflicted"
 
 
+class LeaseStatus(StrEnum):
+    ACTIVE = "active"
+    RELEASED = "released"
+    EXPIRED = "expired"
+    SUSPENDED = "suspended"
+
+
+class ApprovalState(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+
 class DomainModel(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
@@ -78,6 +93,24 @@ class Lease(DomainModel):
     resource_ref: str = Field(min_length=1)
     holder_session_id: str = Field(min_length=1)
     expires_at: datetime
+    status: LeaseStatus = LeaseStatus.ACTIVE
+    action_id: str | None = None
+    acquired_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ApprovalRequest(DomainModel):
+    request_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    action_id: str = Field(min_length=1)
+    capability_id: str = Field(min_length=1)
+    risk_level: RiskLevel
+    resource_refs: list[str] = Field(default_factory=list)
+    requested_by_session_id: str = Field(min_length=1)
+    reason: str = ""
+    state: ApprovalState = ApprovalState.PENDING
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 class AuditEvent(DomainModel):

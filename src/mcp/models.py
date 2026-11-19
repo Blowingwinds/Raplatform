@@ -33,6 +33,10 @@ class CallRequest(BaseModel):
     risk_level: RiskLevel = RiskLevel.LOW
     timeout_seconds: int = Field(default=300, ge=1, le=86_400)
     max_concurrency: int = Field(default=1, ge=1, le=64)
+    resource_ref: str | None = Field(
+        default=None,
+        description="Optional resource reference for lease checking (e.g. 'asset:10.10.20.15').",
+    )
 
 
 class CallResult(BaseModel):

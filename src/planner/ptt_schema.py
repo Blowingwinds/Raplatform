@@ -62,6 +62,10 @@ class ActionContract(BaseModel):
         default_factory=list,
         description="Conditions under which the action must stop",
     )
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Action IDs that must complete before this action can run",
+    )
 
     @field_validator("expected_outputs")
     @classmethod
@@ -165,6 +169,10 @@ class ActionNode(BaseModel):
         default_factory=list,
         description="Action IDs of dynamically appended child actions",
     )
+    parent_action_id: str | None = Field(
+        default=None,
+        description="ID of the action that triggered this dynamic node's creation",
+    )
     result_summary: str = ""
 
     def mark_ready(self) -> None:
@@ -236,13 +244,23 @@ class PTTTree(BaseModel):
 
     # ── query ──────────────────────────────────────────────────────────
 
+    def _all_actions(self) -> list[ActionContract]:
+        """All actions including dynamic nodes."""
+        static = self.plan.all_actions()
+        dynamic = [n.action for n in self.dynamic_nodes.values()]
+        return static + dynamic
+
+    def _all_action_ids(self) -> set[str]:
+        """All action IDs including dynamic nodes."""
+        return {a.action_id for a in self._all_actions()}
+
     def ready_actions(self) -> list[ActionContract]:
         """Return all actions currently in READY state."""
         ready_ids = {
             aid for aid, status in self.node_states.items()
             if status == PTTNodeStatus.READY
         }
-        return [a for a in self.plan.all_actions() if a.action_id in ready_ids]
+        return [a for a in self._all_actions() if a.action_id in ready_ids]
 
     def planned_actions(self) -> list[ActionContract]:
         """Return all actions still in PLANNED state."""
@@ -250,7 +268,7 @@ class PTTTree(BaseModel):
             aid for aid, status in self.node_states.items()
             if status == PTTNodeStatus.PLANNED
         }
-        return [a for a in self.plan.all_actions() if a.action_id in planned_ids]
+        return [a for a in self._all_actions() if a.action_id in planned_ids]
 
     def succeeded_actions(self) -> list[ActionContract]:
         """Return all successfully completed actions."""
@@ -258,7 +276,7 @@ class PTTTree(BaseModel):
             aid for aid, status in self.node_states.items()
             if status == PTTNodeStatus.SUCCEEDED
         }
-        return [a for a in self.plan.all_actions() if a.action_id in ok_ids]
+        return [a for a in self._all_actions() if a.action_id in ok_ids]
 
     def blocked_actions(self) -> list[ActionContract]:
         """Return all blocked actions."""
@@ -266,7 +284,23 @@ class PTTTree(BaseModel):
             aid for aid, status in self.node_states.items()
             if status == PTTNodeStatus.BLOCKED
         }
-        return [a for a in self.plan.all_actions() if a.action_id in blocked_ids]
+        return [a for a in self._all_actions() if a.action_id in blocked_ids]
+
+    def get_node(self, action_id: str) -> ActionNode:
+        """Get the runtime ActionNode for any action (static or dynamic)."""
+        if action_id in self.dynamic_nodes:
+            return self.dynamic_nodes[action_id]
+        # Build a runtime view for a static action
+        static = next(
+            (a for a in self.plan.all_actions() if a.action_id == action_id),
+            None,
+        )
+        if static is None:
+            raise ValueError(f"Unknown action_id: {action_id}")
+        return ActionNode(
+            action=static,
+            status=self.node_states.get(action_id, PTTNodeStatus.PLANNED),
+        )
 
     def is_complete(self) -> bool:
         """True when all actions have reached a terminal state."""
@@ -289,11 +323,57 @@ class PTTTree(BaseModel):
 
     # ── mutation (hive calls these) ────────────────────────────────────
 
+    def recompute_ready(self) -> int:
+        """Promote PLANNED actions to READY when all dependencies are satisfied.
+
+        A dependency is satisfied when it is SUCCEEDED or SKIPPED.
+
+        Returns the number of actions newly promoted.
+        """
+        terminal_ok = {PTTNodeStatus.SUCCEEDED, PTTNodeStatus.SKIPPED}
+        promoted = 0
+        for action in self._all_actions():
+            current = self.node_states.get(action.action_id)
+            if current != PTTNodeStatus.PLANNED:
+                continue
+            if not action.depends_on:
+                self.node_states[action.action_id] = PTTNodeStatus.READY
+                promoted += 1
+            else:
+                all_satisfied = all(
+                    self.node_states.get(dep) in terminal_ok
+                    for dep in action.depends_on
+                )
+                if all_satisfied:
+                    self.node_states[action.action_id] = PTTNodeStatus.READY
+                    promoted += 1
+        return promoted
+
+    def prune_dependents(self, action_id: str, reason: str = "") -> int:
+        """Recursively mark children SKIPPED when an action FAILED or is pruned.
+
+        Returns the number of actions pruned.
+        """
+        pruned = 0
+        for action in self._all_actions():
+            if action_id in action.depends_on:
+                current = self.node_states.get(action.action_id)
+                if current not in (PTTNodeStatus.SUCCEEDED, PTTNodeStatus.FAILED,
+                                   PTTNodeStatus.BLOCKED, PTTNodeStatus.SKIPPED):
+                    self.node_states[action.action_id] = PTTNodeStatus.SKIPPED
+                    pruned += 1
+                    # Recursively prune grandchildren
+                    pruned += self.prune_dependents(action.action_id, reason)
+        return pruned
+
     def set_status(self, action_id: str, status: PTTNodeStatus) -> None:
         """Update the runtime status of an action node."""
         if action_id not in self.node_states:
             raise ValueError(f"Unknown action_id: {action_id}")
         self.node_states[action_id] = status
+        # Also sync dynamic node state if present
+        if action_id in self.dynamic_nodes:
+            self.dynamic_nodes[action_id].status = status
 
     def add_dynamic_node(self, node: ActionNode) -> None:
         """Append a dynamically discovered action to the tree."""
@@ -302,7 +382,48 @@ class PTTTree(BaseModel):
         self.dynamic_nodes[node.action.action_id] = node
         self.node_states[node.action.action_id] = node.status
 
+    def mark_running(self, action_id: str) -> None:
+        """Mark an action as RUNNING."""
+        current = self.node_states.get(action_id)
+        if current not in (PTTNodeStatus.READY, PTTNodeStatus.PLANNED):
+            raise ValueError(f"Cannot mark {action_id} as RUNNING (currently {current})")
+        self.set_status(action_id, PTTNodeStatus.RUNNING)
+
+    def mark_succeeded(self, action_id: str,
+                       evidence_refs: list[str] | None = None,
+                       summary: str = "") -> None:
+        """Mark an action as SUCCEEDED."""
+        self.set_status(action_id, PTTNodeStatus.SUCCEEDED)
+        if action_id in self.dynamic_nodes:
+            node = self.dynamic_nodes[action_id]
+            if evidence_refs:
+                node.evidence_refs.extend(evidence_refs)
+            if summary:
+                node.result_summary = summary
+
+    def mark_failed(self, action_id: str, reason: str = "") -> None:
+        """Mark an action as FAILED and prune its dependents."""
+        self.set_status(action_id, PTTNodeStatus.FAILED)
+        if reason and action_id in self.dynamic_nodes:
+            self.dynamic_nodes[action_id].result_summary = reason
+        self.prune_dependents(action_id, reason)
+
+    def mark_blocked(self, action_id: str, reason: str = "") -> None:
+        """Mark an action as BLOCKED."""
+        self.set_status(action_id, PTTNodeStatus.BLOCKED)
+        if reason and action_id in self.dynamic_nodes:
+            self.dynamic_nodes[action_id].result_summary = reason
+
     # ── serialization ──────────────────────────────────────────────────
+
+    def to_persistable(self) -> dict:
+        """Serialize for storage."""
+        return self.model_dump(mode="json")
+
+    @classmethod
+    def from_persistable(cls, data: dict) -> "PTTTree":
+        """Deserialize from storage."""
+        return cls.model_validate(data)
 
     def summary(self) -> dict[str, Any]:
         """Human-readable summary for CLI / report output."""

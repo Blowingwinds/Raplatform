@@ -147,3 +147,56 @@ def test_sqlite_store_round_trips_project_scope_session_lease_events(tmp_path):
     assert store.get_lease(lease.lease_id) == lease
     assert store.get_blackboard_event(blackboard_event.event_id) == blackboard_event
     assert store.get_audit_event(audit.audit_id) == audit
+
+
+def test_sqlite_store_round_trips_ptt_tree(tmp_path):
+    from src.planner.ptt_schema import (
+        ActionContract,
+        PTTPlan,
+        PTTTree,
+        PTTNodeStatus,
+        TacticNode,
+        TechniqueNode,
+    )
+
+    store = SQLiteStore(tmp_path / "raplatform.db")
+    action = ActionContract(
+        action_id="act-001",
+        name="Discover services",
+        description="Port scan in scope",
+        technique_id="T1046",
+        target_refs=["scope-001"],
+        expected_outputs=["service.exposed"],
+        risk_level=RiskLevel.LOW,
+    )
+    plan = PTTPlan(
+        plan_id="plan-001",
+        goal="Map exposed services",
+        normalized_goal="map exposed services",
+        project_id="project-001",
+        scope_id="scope-001",
+        tactics=[
+            TacticNode(
+                tactic_id="reconnaissance",
+                name="Reconnaissance",
+                techniques=[
+                    TechniqueNode(
+                        technique_id="T1046",
+                        name="Network Service Scanning",
+                        actions=[action],
+                    ),
+                ],
+            ),
+        ],
+    )
+    tree = PTTTree.from_plan(plan)
+    tree.set_status("act-001", PTTNodeStatus.READY)
+
+    store.save_ptt_tree(plan.project_id, tree.to_persistable())
+    loaded = store.get_ptt_tree(plan.project_id)
+    assert loaded is not None
+    restored = PTTTree.from_persistable(loaded)
+
+    assert restored == tree
+    assert restored.plan.plan_id == "plan-001"
+    assert restored.node_states["act-001"] == PTTNodeStatus.READY

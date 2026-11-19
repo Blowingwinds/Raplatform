@@ -3,6 +3,7 @@
 import pytest
 
 from src.agents.registry import AgentRegistry
+from src.domain.lease_service import LeaseService
 from src.domain.models import (
     AgentCapability,
     AuditEvent,
@@ -14,6 +15,7 @@ from src.domain.storage import SQLiteStore
 from src.mcp.gateway import MCPGateway
 from src.mcp.models import CallRequest, CallResult, CallStatus
 from src.mcp.transport import MockTransport, TransportResult
+from src.policy.approval import ApprovalGate
 from src.policy.guard import PolicyGuard
 
 
@@ -296,3 +298,105 @@ class TestEdgeCases:
         assert result.started_at is not None
         assert result.finished_at is not None
         assert result.finished_at >= result.started_at
+
+
+# ---------------------------------------------------------------------------
+# HITL approval + lease integration (Module 8)
+# ---------------------------------------------------------------------------
+
+class TestApprovalAndLease:
+
+    @pytest.fixture
+    def approval_gateway(self, store, mock_transport):
+        registry = AgentRegistry(store)
+        guard = PolicyGuard(store)
+        gate = ApprovalGate(store, demo_mode=False)
+        return MCPGateway(
+            registry=registry,
+            guard=guard,
+            transport=mock_transport,
+            approval_gate=gate,
+        )
+
+    @pytest.mark.asyncio
+    async def test_high_risk_with_approval_gate_creates_request(
+        self, store, approval_gateway, high_risk_agent, scope,
+    ):
+        approval_gateway._registry.register(high_risk_agent)
+        request = CallRequest(
+            agent_id="agent-rce-verify",
+            scope_id=scope.scope_id,
+            task_id="task-approve-1",
+            project_id=scope.project_id,
+            risk_level=RiskLevel.CRITICAL,
+        )
+        result = await approval_gateway.execute(request)
+        assert result.status == CallStatus.WAITING_APPROVAL
+        # approval request id embedded in error message
+        assert result.error is not None
+        assert "approval_request_id=approval-" in result.error
+        # extract id and confirm the approval record is persisted & pending
+        approval_id = result.error.split("approval_request_id=")[1].strip()
+        req = store.get_approval(approval_id)
+        assert req is not None
+        from src.domain.models import ApprovalState
+        assert req.state == ApprovalState.PENDING
+
+    @pytest.mark.asyncio
+    async def test_high_risk_succeeds_after_approval(
+        self, store, approval_gateway, high_risk_agent, scope,
+    ):
+        approval_gateway._registry.register(high_risk_agent)
+        request = CallRequest(
+            agent_id="agent-rce-verify",
+            scope_id=scope.scope_id,
+            task_id="task-approve-2",
+            project_id=scope.project_id,
+            risk_level=RiskLevel.CRITICAL,
+        )
+        first = await approval_gateway.execute(request)
+        assert first.status == CallStatus.WAITING_APPROVAL
+        approval_id = first.error.split("approval_request_id=")[1].strip()
+
+        # Approve via the gate, then re-execute with the *same* CRITICAL risk.
+        # The transport has no canned response for this agent, so MockTransport
+        # returns an empty-but-success result.
+        approval_gateway._approval_gate.approve(approval_id, decided_by="tester")
+
+        result = await approval_gateway.execute(request)
+        assert result.status == CallStatus.SUCCEEDED
+
+    @pytest.mark.asyncio
+    async def test_lease_conflict_returns_rejected_lease(
+        self, store, mock_transport, agent_cap, scope,
+    ):
+        lease_svc = LeaseService(store)
+        # Acquire a lease on a resource held by a *different* session.
+        lease_svc.acquire(
+            project_id=scope.project_id,
+            resource_ref="asset:10.10.20.15",
+            session_id="session-other",
+            action_id="act-1",
+        )
+
+        registry = AgentRegistry(store)
+        guard = PolicyGuard(store)
+        gw = MCPGateway(
+            registry=registry,
+            guard=guard,
+            transport=mock_transport,
+            lease_service=lease_svc,
+        )
+        registry.register(agent_cap)
+
+        request = CallRequest(
+            agent_id="agent-info-gatherer",
+            scope_id=scope.scope_id,
+            task_id="task-lease-1",
+            project_id=scope.project_id,
+            risk_level=RiskLevel.LOW,
+            resource_ref="asset:10.10.20.15",
+        )
+        result = await gw.execute(request)
+        assert result.status == CallStatus.REJECTED_LEASE
+        assert "held by session" in (result.error or "")

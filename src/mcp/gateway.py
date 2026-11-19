@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from src.agents.registry import AgentRegistry
 from src.domain.models import AuditEvent, RiskLevel
 from src.mcp.models import CallRequest, CallResult, CallStatus
 from src.mcp.transport import Transport
 from src.policy.guard import PolicyGuard
+
+if TYPE_CHECKING:
+    from src.domain.lease_service import LeaseService
+    from src.policy.approval import ApprovalGate
 
 
 class MCPGateway:
@@ -18,10 +23,14 @@ class MCPGateway:
         registry: AgentRegistry,
         guard: PolicyGuard,
         transport: Transport,
+        lease_service: "LeaseService | None" = None,
+        approval_gate: "ApprovalGate | None" = None,
     ) -> None:
         self._registry = registry
         self._guard = guard
         self._transport = transport
+        self._lease_service = lease_service
+        self._approval_gate = approval_gate
 
     async def execute(self, request: CallRequest) -> CallResult:
         call_id = f"call-{uuid.uuid4().hex[:12]}"
@@ -46,24 +55,69 @@ class MCPGateway:
 
         # ---- 3. risk gate ----------------------------------------------------
         if self._guard.needs_approval(request.risk_level):
-            audit.append(self._make_audit(
-                request.project_id, "gateway.risk_blocked", "gateway",
-                request.agent_id, f"call {call_id}",
-                {"risk_level": request.risk_level.value},
-            ))
-            return CallResult(
-                call_id=call_id,
-                status=CallStatus.WAITING_APPROVAL,
-                agent_id=request.agent_id,
-                audit_events=[a.model_dump(mode="json") for a in audit],
-                started_at=started,
+            # If an approval has already been granted for this action, skip
+            # the WAITING_APPROVAL return and proceed to dispatch.
+            already_granted = (
+                self._approval_gate is not None
+                and self._approval_gate.is_granted(request.task_id)
             )
+            if not already_granted:
+                approval_req_id: str | None = None
+                if self._approval_gate is not None:
+                    approval_req = self._approval_gate.request(
+                        action_id=request.task_id,
+                        capability_id=request.agent_id,
+                        session_id=request.scope_id,
+                        project_id=request.project_id,
+                        risk_level=request.risk_level,
+                        resource_refs=[request.resource_ref] if request.resource_ref else None,
+                        reason=f"call {call_id} risk_level={request.risk_level.value}",
+                    )
+                    approval_req_id = approval_req.request_id
+                audit.append(self._make_audit(
+                    request.project_id, "gateway.risk_blocked", "gateway",
+                    request.agent_id, f"call {call_id}",
+                    {"risk_level": request.risk_level.value,
+                     "approval_request_id": approval_req_id},
+                ))
+                reason = "risk level requires approval"
+                if approval_req_id is not None:
+                    reason = f"risk level requires approval; approval_request_id={approval_req_id}"
+                return CallResult(
+                    call_id=call_id,
+                    status=CallStatus.WAITING_APPROVAL,
+                    agent_id=request.agent_id,
+                    error=reason,
+                    audit_events=[a.model_dump(mode="json") for a in audit],
+                    started_at=started,
+                )
+            audit.append(self._make_audit(
+                request.project_id, "gateway.risk_approved", "gateway",
+                request.agent_id, f"call {call_id}",
+                {"risk_level": request.risk_level.value,
+                 "action_id": request.task_id},
+            ))
 
-        # ---- 4. concurrency / lease check (stub) ----------------------------
-        # Full lease check in phase 5; here we just note the limit.
+        # ---- 4. concurrency / lease check -----------------------------------
         if request.max_concurrency < 1:
             return self._rejected(call_id, request.agent_id, CallStatus.REJECTED_LEASE,
                                   "max_concurrency must be >= 1", audit, started)
+
+        if self._lease_service is not None and request.resource_ref:
+            held = self._lease_service.is_held(request.project_id, request.resource_ref)
+            if held is not None and held.holder_session_id != request.scope_id:
+                audit.append(self._make_audit(
+                    request.project_id, "gateway.lease_conflict", "gateway",
+                    request.agent_id, request.resource_ref,
+                    {"holder_session_id": held.holder_session_id,
+                     "lease_id": held.lease_id},
+                ))
+                return self._rejected(
+                    call_id, request.agent_id, CallStatus.REJECTED_LEASE,
+                    f"resource {request.resource_ref} held by session "
+                    f"{held.holder_session_id}",
+                    audit, started,
+                )
 
         # ---- 5. dispatch ----------------------------------------------------
         audit.append(self._make_audit(

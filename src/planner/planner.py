@@ -116,9 +116,8 @@ class Planner:
         # ── wrap as live tree ────────────────────────────────────────
         tree = PTTTree.from_plan(plan)
 
-        # Mark all actions as READY (no dependency ordering in Phase 4)
-        for action in plan.all_actions():
-            tree.node_states[action.action_id] = tree.node_states[action.action_id]
+        # Promote root actions (no dependencies) to READY
+        tree.recompute_ready()
 
         return tree
 
