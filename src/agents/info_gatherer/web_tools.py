@@ -8,7 +8,7 @@ import re
 import tempfile
 from pathlib import Path
 
-_FFUF_PATH = "C:/Users/ASUS/go/bin/ffuf.exe"
+from src.agents.shared.tool_paths import resolve_tool
 
 _WORDLIST: list[str] = [
     "admin", "api", "login", "robots.txt", "sitemap.xml",
@@ -38,8 +38,8 @@ _FFUF_TEXT_RE = re.compile(
 
 
 async def discover_endpoints(base_url: str, wordlist: list[str] | None = None) -> list[dict]:
-    ffuf_path = Path(_FFUF_PATH)
-    if not ffuf_path.exists():
+    ffuf_path = resolve_tool("ffuf")
+    if ffuf_path is None:
         return []
 
     wl = wordlist or _WORDLIST
@@ -51,7 +51,7 @@ async def discover_endpoints(base_url: str, wordlist: list[str] | None = None) -
 
     try:
         proc = await asyncio.create_subprocess_exec(
-            str(ffuf_path),
+            ffuf_path,
             "-u", f"{base_url.rstrip('/')}/FUZZ",
             "-w", wordlist_path,
             "-mc", "200-299,301,302,307,401,405,500",

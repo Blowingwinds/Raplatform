@@ -6,9 +6,8 @@ import asyncio
 import json
 import re
 import tempfile
-from pathlib import Path
 
-_SQLMAP_PATH = "D:/python/Scripts/sqlmap"
+from src.agents.shared.tool_paths import resolve_tool
 
 
 async def verify_sqli(url: str, timeout: float = 600.0) -> dict | None:
@@ -16,15 +15,15 @@ async def verify_sqli(url: str, timeout: float = 600.0) -> dict | None:
 
     Returns None if no SQL injection is found.
     """
-    sqlmap_path = Path(_SQLMAP_PATH)
-    if not sqlmap_path.exists():
+    sqlmap_path = resolve_tool("sqlmap")
+    if sqlmap_path is None:
         return None
 
     # SQLmap writes to a temp file (--batch + --output-dir)
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
             proc = await asyncio.create_subprocess_exec(
-                "python", str(sqlmap_path),
+                "python", sqlmap_path,
                 "-u", url,
                 "--batch",
                 "--risk", "2",

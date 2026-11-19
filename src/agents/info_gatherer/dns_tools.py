@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 import dns.resolver
 import httpx
 
-_SUBFINDER_PATH = "C:/Users/ASUS/go/bin/subfinder.exe"
+from src.agents.shared.tool_paths import resolve_tool
 
 
 async def resolve_dns(hostname: str, record_types: list[str] | None = None) -> list[dict]:
@@ -28,11 +27,11 @@ async def resolve_dns(hostname: str, record_types: list[str] | None = None) -> l
 
 async def enumerate_subdomains(domain: str) -> list[dict]:
     subdomains: list[str] = []
-    subfinder_path = Path(_SUBFINDER_PATH)
-    if subfinder_path.exists():
+    subfinder_path = resolve_tool("subfinder")
+    if subfinder_path is not None:
         try:
             proc = await asyncio.create_subprocess_exec(
-                str(subfinder_path), "-d", domain, "-silent",
+                subfinder_path, "-d", domain, "-silent",
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60.0)

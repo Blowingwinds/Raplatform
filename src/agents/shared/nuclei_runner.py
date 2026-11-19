@@ -8,7 +8,7 @@ import json
 import tempfile
 from pathlib import Path
 
-_NUCLEI_PATH = "C:/Users/ASUS/go/bin/nuclei.exe"
+from src.agents.shared.tool_paths import resolve_tool
 
 # Pass 1: technology fingerprinting (single Wappalyzer-style template)
 _TECH_IDS = "tech-detect"
@@ -207,8 +207,8 @@ async def _run_nuclei(
     timeout: float = 120.0,
     concurrency: int = 15,
 ) -> list[dict]:
-    nuclei_path = Path(_NUCLEI_PATH)
-    if not nuclei_path.exists():
+    nuclei_path = resolve_tool("nuclei")
+    if nuclei_path is None:
         return []
 
     if tags is None and ids is None:
@@ -221,7 +221,7 @@ async def _run_nuclei(
         targets_file = f.name
 
     cmd = [
-        str(nuclei_path),
+        nuclei_path,
         "-list", targets_file,
         "-severity", severity,
         "-jsonl",
