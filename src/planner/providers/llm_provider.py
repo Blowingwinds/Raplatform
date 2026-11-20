@@ -58,6 +58,11 @@ Hard rules:
    at most 6 actions unless the goal demands more.
 9. Do not invent techniques outside the whitelist; do not add extra keys.
 10. Only include tactics you actually use — never emit an empty tactic.
+11. If the goal involves vulnerability detection / penetration testing, the plan
+    MUST contain at least one action whose expected_outputs includes
+    "vulnerability.detected" (put it under initial-access with T1190,
+    risk_level "medium"), ordered AFTER the reconnaissance/scanning actions.
+    A plan without any vulnerability-detection action is invalid for such goals.
 """
 
 

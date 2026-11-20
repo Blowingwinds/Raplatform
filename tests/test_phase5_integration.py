@@ -46,6 +46,7 @@ def _setup_orchestrator(store, *, demo_mode=True, max_rounds=6):
     )
     # Orchestration-only tests: disable tool hints so no real scanner runs.
     orch._tool_hints = lambda action, capability_id=None: []
+    orch._chain_tactics_in_order = lambda: None  # tests exercise a single round
     return orch
 
 

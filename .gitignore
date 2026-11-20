@@ -11,3 +11,14 @@ __pycache__/
 .env.*
 !.env.example
 *.local.json
+# ── runtime artifacts (not source) ──
+*.log
+trace_*.log
+vm_*.db
+*_report.md
+*_report_zh.md
+ptt_tree*.md
+ptt_tree*.mmd
+ptt_tree*.html
+topology_*.mmd
+topology_*.html

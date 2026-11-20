@@ -54,6 +54,7 @@ class TestSessionReuse:
             max_rounds=1, crew_runner=FakeCrewRunner(),
         )
         orch._tool_hints = lambda action, capability_id=None: []
+        orch._chain_tactics_in_order = lambda: None
 
         s1 = orch.run(seed_targets=["192.168.240.128"])
         s2 = orch.run(seed_targets=["192.168.240.128"])  # same session id
@@ -82,6 +83,7 @@ class TestPlannerFallback:
 
         orch._planner = _BrokenPlanner()
         orch._tool_hints = lambda action, capability_id=None: []
+        orch._chain_tactics_in_order = lambda: None
 
         summary = orch.run(seed_targets=["192.168.240.128"], goal="执行完整渗透测试")
 

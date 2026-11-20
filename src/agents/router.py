@@ -68,6 +68,7 @@ class AgentRouter:
         *,
         target_type: str,
         session_id: str,
+        prefer: str | None = None,
     ) -> RouteDecision:
         """Select the best agent for an action.
 
@@ -80,7 +81,10 @@ class AgentRouter:
            lease.active_count_for_capability(cap_id). If active >= max_concurrency
            the candidate is deferred.
         4. Technique/target overlap score (from find_best).
-        5. Highest score wins; tie-break: lower risk_level, then lower load.
+        5. *prefer* (optional capability id) gets a dominant bonus — ATT&CK
+           techniques overlap across capabilities (T1595 is claimed by four),
+           so the caller's output-type hint disambiguates.
+        6. Highest score wins; tie-break: lower risk_level, then lower load.
         """
         risk_max = action.risk_level
 
@@ -99,6 +103,19 @@ class AgentRouter:
             if _RISK_ORDER.get(c.risk_level, 99) <= _RISK_ORDER.get(risk_max, 99)
         ]
 
+        # The preferred capability may be absent from the technique/target pool
+        # (planners often express "vuln probing" with T1046, only claimed by the
+        # recon agent). Pull it in explicitly so the hint can win — risk gate
+        # still applies.
+        if prefer:
+            preferred_cap = self._registry.get(prefer)
+            if (
+                preferred_cap is not None
+                and _RISK_ORDER.get(preferred_cap.risk_level, 99) <= _RISK_ORDER.get(risk_max, 99)
+                and all(c.capability_id != prefer for c in candidates)
+            ):
+                candidates.append(preferred_cap)
+
         if not candidates:
             return RouteDecision(
                 capability_id="",
@@ -115,7 +132,8 @@ class AgentRouter:
         for cap in candidates:
             tech_overlap = 1 if tech_id in cap.techniques else 0
             target_overlap = 1 if target_type in cap.target_types else 0
-            score = float(tech_overlap + target_overlap)
+            prefer_hit = prefer is not None and cap.capability_id == prefer
+            score = float(tech_overlap + target_overlap) + (100.0 if prefer_hit else 0.0)
             load = self._lease.active_count_for_capability(cap.capability_id)
             at_max = load >= cap.max_concurrency
             if not at_max:
@@ -127,6 +145,8 @@ class AgentRouter:
                 f"load={load}/{cap.max_concurrency}",
                 f"risk={cap.risk_level.value}",
             ]
+            if prefer_hit:
+                reasons.append("preferred_capability")
             if at_max:
                 reasons.append("at_max_concurrency")
             ranked.append((cap, score, load, at_max, reasons))

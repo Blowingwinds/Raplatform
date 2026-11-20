@@ -56,6 +56,7 @@ def cmd_scan(args: argparse.Namespace) -> None:
         planner=planner,
         verbose=args.verbose,
         demo_mode=not args.no_demo,
+        trace=print if getattr(args, "trace", False) else None,
     )
 
     targets = [t.strip() for t in args.target.split(",") if t.strip()]
@@ -535,6 +536,8 @@ def main() -> None:
                              "(e.g. '执行完整渗透测试'; default: derive from targets)")
     p_scan.add_argument("--provider", choices=("mock", "llm"), default="mock",
                         help="PTT planner backend (default: mock; 'llm' uses .env config)")
+    p_scan.add_argument("--trace", "-T", action="store_true",
+                        help="实时打印 PTT 树变化、动态节点追加/裁剪与黑板增量")
     p_scan.add_argument("--project", default="default",
                         help="Project ID (default: default)")
     p_scan.add_argument("--scope", default="default-scope",

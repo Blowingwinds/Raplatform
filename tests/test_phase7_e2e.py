@@ -41,6 +41,7 @@ def _build_orch(store, **kw):
     # These tests exercise the orchestration pipeline; keep them offline by
     # disabling tool hints (real scanners are covered by unit tests).
     orch._tool_hints = lambda action, capability_id=None: []
+    orch._chain_tactics_in_order = lambda: None  # tests exercise a single round
     return orch
 
 

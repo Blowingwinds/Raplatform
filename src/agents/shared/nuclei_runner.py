@@ -174,7 +174,7 @@ async def scan_vulnerabilities(
     """
     raw = await _run_nuclei(targets, tags=tags or _VULN_TAGS,
                             severity="critical,high,medium,low",
-                            timeout=timeout, concurrency=20)
+                            timeout=timeout, concurrency=50)
     results: list[dict] = []
     for entry in raw:
         results.append(_normalize_vuln(entry))
@@ -203,7 +203,9 @@ async def _run_nuclei(
     severity: str = "info,low,medium,high,critical",
     timeout: float = 120.0,
     concurrency: int = 15,
-    request_timeout: float = 30.0,
+    # Per-request timeout: 10s keeps slow/legacy services from eating the
+    # whole wall-clock budget (was 30s and dominated runtime on old targets).
+    request_timeout: float = 10.0,
 ) -> list[dict]:
     nuclei_path = resolve_tool("nuclei")
     if nuclei_path is None:
@@ -257,14 +259,15 @@ async def _run_nuclei(
 def _normalize_vuln(entry: dict) -> dict:
     info = entry.get("info", {}) or {}
     classification = info.get("classification", {}) or {}
+    matched_at = _canonical_url(entry.get("matched-at", entry.get("host", "")))
     return {
-        "vulnerability_id": _make_vuln_id(entry),
+        "vulnerability_id": _make_vuln_id(entry, matched_at),
         "category": _extract_category(entry),
         "severity": _SEVERITY_MAP.get(info.get("severity", "low"), "low"),
         "title": info.get("name", "Unknown"),
         "cve_ref": _first(classification.get("cve-id", [])),
         "cwe_ref": _first(classification.get("cwe-id", [])),
-        "matched_at": entry.get("matched-at", entry.get("host", "")),
+        "matched_at": matched_at,
         "template_id": entry.get("template-id", ""),
         "curl_command": entry.get("curl-command", ""),
         "verified": False,
@@ -273,11 +276,24 @@ def _normalize_vuln(entry: dict) -> dict:
     }
 
 
-def _make_vuln_id(entry: dict) -> str:
+def _make_vuln_id(entry: dict, matched_at: str | None = None) -> str:
     template = entry.get("template-id", "unknown")
-    host = entry.get("host", entry.get("matched-at", "unknown"))
+    host = matched_at or entry.get("host", entry.get("matched-at", "unknown"))
     key = f"{template}:{host}"
     return f"vuln-{hashlib.sha256(key.encode()).hexdigest()[:16]}"
+
+
+def _canonical_url(value: str) -> str:
+    """Drop default ports so ``http://h`` and ``http://h:80`` dedupe as one finding."""
+    if not value or "://" not in value:
+        return value
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(value)
+    host = parsed.hostname or ""
+    port = parsed.port
+    netloc = host if port in (None, 80, 443) else f"{host}:{port}"
+    return urlunparse((parsed.scheme, netloc, parsed.path, "", parsed.query, ""))
 
 
 def _extract_category(entry: dict) -> str:

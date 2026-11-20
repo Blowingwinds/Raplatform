@@ -15,7 +15,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 from src.agents.capabilities import register_default_capabilities
 from src.agents.hive.crews import (
@@ -54,6 +54,32 @@ from src.policy.approval import ApprovalGate
 from src.policy.guard import PolicyGuard
 
 logger = logging.getLogger("hive.orchestrator")
+
+# Ports that are commonly HTTP(S) even when the banner probe reported "unknown".
+_HTTP_PORT_HINTS: frozenset[int] = frozenset({
+    80, 443, 3000, 4848, 5000, 7000, 8000, 8008, 8009, 8020,
+    8080, 8088, 8282, 8443, 8484, 8585, 8888, 9000, 9090,
+    9200, 9300, 10000,
+})
+
+# Scan order: web entrypoints first, then app servers, then data stores.
+_PORT_PRIORITY: dict[int, int] = {
+    80: 0, 443: 0, 8080: 1, 8009: 2, 8282: 3, 8484: 4,
+    8585: 5, 8020: 6, 4848: 7, 9200: 8, 9300: 9,
+}
+
+
+_VERIFY_KEYWORDS = ("验证", "verify", "exploit", "利用", "confirmed")
+_WEB_KEYWORDS = ("sqli", "xss", "ssrf", "ssti", "injection", "注入", "跨站", "web")
+
+
+def _scan_priority(url: str) -> int:
+    """Sort key for scan targets — lower is scanned first."""
+    try:
+        port = int(url.rsplit(":", 1)[1])
+    except (IndexError, ValueError):
+        return 99
+    return _PORT_PRIORITY.get(port, 50)
 
 
 # ── run summary ─────────────────────────────────────────────────────────
@@ -135,6 +161,7 @@ class HiveOrchestrator:
         transport: Transport | None = None,
         crew_runner: Any = None,
         planner: Planner | None = None,
+        trace: Callable[[str], None] | None = None,
     ) -> None:
         self._store = store
         self._project_id = project_id
@@ -144,6 +171,7 @@ class HiveOrchestrator:
         self._max_rounds = max_rounds
         self._verbose = verbose
         self._demo_mode = demo_mode
+        self._trace = trace
 
         # ── wiring ──
         self._registry = AgentRegistry(store)
@@ -275,10 +303,23 @@ class HiveOrchestrator:
         round_log: list[dict[str, Any]] = []
         rounds_without_events = 0
 
+        # Chain tactic order into implicit dependencies (see method docstring)
+        self._chain_tactics_in_order()
+
         for round_num in range(1, self._max_rounds + 1):
             # ── sweep expired leases & approvals ──
             self._lease.sweep_expired()
             self._approval.sweep_expired()
+
+            if self._trace:
+                prog = self._tree.progress() if self._tree else {}
+                self._emit_trace(
+                    f"\n=== Round {round_num}/{self._max_rounds} ===  "
+                    f"PTT total={prog.get('total', 0)} "
+                    f"ready={prog.get('ready', 0)} running={prog.get('running', 0)} "
+                    f"ok={prog.get('succeeded', 0)} fail={prog.get('failed', 0)} "
+                    f"blocked={prog.get('blocked', 0)}"
+                )
 
             # ── read blackboard deltas ──
             events = self._blackboard.events_since(
@@ -288,18 +329,61 @@ class HiveOrchestrator:
                 self._last_sequence = max(e.sequence for e in events)
                 self._metrics_events += len(events)
                 rounds_without_events = 0
+                if self._trace:
+                    created = [
+                        e.observation for e in events
+                        if e.event_type == "fact.created" and e.observation is not None
+                    ]
+                    if created:
+                        preview = ", ".join(
+                            f"{f.fact_type}@{f.asset_ref}" for f in created[:8]
+                        )
+                        more = f" …+{len(created) - 8}" if len(created) > 8 else ""
+                        self._emit_trace(
+                            f"  [黑板] 新增 {len(created)} 条事实: {preview}{more}"
+                        )
+                    else:
+                        self._emit_trace(f"  [黑板] 事件 {len(events)} 条（无新事实）")
             else:
                 rounds_without_events += 1
 
             # ── re-orchestrate ──
             if events:
+                nodes_before = set(self._tree.dynamic_nodes) if self._tree else set()
+                statuses_before = dict(self._tree.node_states) if self._tree else {}
+
                 self._reorch.react(self._tree, events, self._project_id)
+
+                if self._trace and self._tree:
+                    added = set(self._tree.dynamic_nodes) - nodes_before
+                    if added:
+                        names = []
+                        for node_id in sorted(added)[:6]:
+                            node = self._tree.dynamic_nodes[node_id]
+                            names.append(
+                                f"{node_id}({','.join(node.action.target_refs)})"
+                            )
+                        more = f" …+{len(added) - 6}" if len(added) > 6 else ""
+                        self._emit_trace(
+                            f"  [树] 动态追加 {len(added)} 个节点: {', '.join(names)}{more}"
+                        )
+                    pruned = [
+                        aid for aid, st in self._tree.node_states.items()
+                        if st == PTTNodeStatus.SKIPPED
+                        and statuses_before.get(aid) != PTTNodeStatus.SKIPPED
+                    ]
+                    if pruned:
+                        self._emit_trace(
+                            f"  [树] 裁剪 {len(pruned)} 个节点: {', '.join(pruned[:6])}"
+                        )
 
                 # ── topology projection: persist network.relation facts ──
                 try:
-                    self._topology.emit_relations(
+                    projected = self._topology.emit_relations(
                         self._project_id, session_id=self._session_id,
                     )
+                    if self._trace and projected:
+                        self._emit_trace(f"  [拓扑] 写入 {projected} 条 network.relation")
                 except Exception as exc:
                     logger.warning("Topology projection failed: %s", exc)
 
@@ -326,8 +410,19 @@ class HiveOrchestrator:
 
             # ── dispatch each ready action ──
             for action in ready:
-                # HITL check for high-risk actions
-                if self._guard.is_high_risk(action.risk_level):
+                # The ready list is a round-start snapshot. An earlier failure in
+                # this same loop can prune dependents to SKIPPED, so re-check the
+                # live state before dispatching.
+                live_status = self._tree.node_states.get(action.action_id)
+                if live_status != PTTNodeStatus.READY:
+                    if self._trace:
+                        self._emit_trace(
+                            f"  [跳过] {action.action_id} 已被裁剪（状态 {live_status}）"
+                        )
+                    continue
+
+                # HITL check for high-risk actions (demo_mode auto-approves)
+                if self._guard.needs_approval(action.risk_level):
                     if not self._approval.is_granted(action.action_id):
                         self._approval.request(
                             action_id=action.action_id,
@@ -349,6 +444,7 @@ class HiveOrchestrator:
                 decision = self._router.route(
                     action, target_type=target_type,
                     session_id=self._session_id,
+                    prefer=self._preferred_capability(action),
                 )
                 if decision.deferred:
                     self._tree.mark_blocked(
@@ -380,6 +476,11 @@ class HiveOrchestrator:
                 # Dispatch
                 self._tree.mark_running(action.action_id)
                 self._metrics_actions["dispatched"] += 1
+                if self._trace:
+                    self._emit_trace(
+                        f"  [调度] {action.action_id} → {decision.capability_id} "
+                        f"(risk={str(action.risk_level)})"
+                    )
                 result = self._dispatch_action(action, decision.capability_id)
 
                 # Release lease
@@ -398,9 +499,20 @@ class HiveOrchestrator:
                         except Exception as exc:
                             logger.warning("Failed to ingest evidence %s: %s",
                                           evidence.evidence_id, exc)
+                    if self._trace:
+                        obs_total = sum(
+                            len(e.raw_payload.get("observations", []) or [])
+                            for e in result.evidence
+                        )
+                        self._emit_trace(
+                            f"  [完成] {action.action_id} ✓ evidence={len(result.evidence)} "
+                            f"observations={obs_total}"
+                        )
                 else:
                     self._tree.mark_failed(action.action_id, reason="no evidence produced")
                     self._metrics_actions["failed"] += 1
+                    if self._trace:
+                        self._emit_trace(f"  [失败] {action.action_id} ✗ 无 evidence")
 
                 # Recompute readiness after each action
                 self._tree.recompute_ready()
@@ -420,11 +532,42 @@ class HiveOrchestrator:
                 "new_events": len(events),
             })
 
+            if self._trace:
+                self._emit_trace(
+                    f"  [轮末] ok={progress.get('succeeded', 0)} "
+                    f"fail={progress.get('failed', 0)} "
+                    f"blocked={progress.get('blocked', 0)} "
+                    f"ready={progress.get('ready', 0)}"
+                )
+
+            # Persist the tree every round so external watchers see live state
+            self._persist_tree()
+
         # Max rounds reached
         self._close_session(SessionStatus.SUCCEEDED)
         return self._build_summary(self._max_rounds, round_log, truncated=True)
 
     # ── internal: dispatch ──────────────────────────────────────────────
+
+    def _emit_trace(self, message: str) -> None:
+        """Send one trace line to the optional observer callback."""
+        if self._trace is None:
+            return
+        try:
+            self._trace(message)
+        except Exception:  # noqa: BLE001 - observers must never break the run
+            pass
+
+    def _persist_tree(self) -> None:
+        """Save the live tree so external watchers/CLI can read current state."""
+        if not self._tree:
+            return
+        try:
+            self._store.save_ptt_tree(
+                self._project_id, self._tree.model_dump(mode="json"),
+            )
+        except Exception as exc:  # noqa: BLE001 - persistence is best-effort
+            logger.debug("PTT tree persistence failed: %s", exc)
 
     def _dispatch_action(
         self,
@@ -538,6 +681,44 @@ class HiveOrchestrator:
             return f"{host}:{port}"
         return target
 
+    def _preferred_capability(self, action: Any) -> str | None:
+        """Prefer the capability whose tools actually produce this action's outputs.
+
+        ATT&CK techniques overlap across capabilities (T1595 is claimed by
+        info-gatherer, framework-vuln, web-attack and component-vuln), so
+        technique-only routing sends vulnerability scans to the recon agent.
+        Expected outputs plus the action description disambiguate.
+        """
+        outputs = set(getattr(action, "expected_outputs", None) or [])
+        description = str(getattr(action, "description", "")).lower()
+        risk = str(getattr(action, "risk_level", "")).lower()
+
+        wants_vuln = bool(outputs & {"vulnerability.detected", "credential.validated"})
+        wants_fp = "fingerprint.detected" in outputs
+
+        if wants_vuln:
+            high_risk = risk in ("high", "critical")
+            wants_verify = (
+                any(k in description for k in _VERIFY_KEYWORDS)
+                or ("credential.validated" in outputs and high_risk)
+            )
+            # exploit-verifier is HIGH risk — only usable when the action allows it
+            if wants_verify and high_risk:
+                return "exploit-verifier"
+            if any(k in description for k in _WEB_KEYWORDS):
+                return "web-attack"
+            # Default: framework-vuln carries the CVE template batch, which is
+            # where metasploitable-style findings come from.
+            return "framework-vuln"
+
+        if wants_fp:
+            return "framework-vuln"
+
+        if outputs & {"service.exposed", "asset.discovered", "subdomain.discovered"}:
+            return "info-gatherer"
+
+        return None
+
     def _resolve_targets(self, action: Any) -> list[str]:
         """Resolve planner wildcard target refs (``"*"``) to concrete seed targets."""
         refs = [
@@ -547,6 +728,32 @@ class HiveOrchestrator:
         if refs:
             return refs
         return list(self._seed_targets)
+
+    def _chain_tactics_in_order(self) -> None:
+        """Give actions implicit dependencies on the preceding tactic's actions.
+
+        Planners typically leave ``depends_on`` empty, which makes every action
+        READY in round 1 — scans then fire before reconnaissance produced any
+        service list, so multi-port expansion has nothing to expand from.
+        Chaining tactic order makes reconnaissance finish first, and keeps the
+        PTT execution order faithful to the plan.
+        """
+        tree = getattr(self, "_tree", None)
+        if tree is None:
+            return
+
+        previous_ids: list[str] = []
+        for tactic in tree.plan.tactics:
+            actions = [
+                act for tech in tactic.techniques for act in tech.actions
+            ]
+            if previous_ids:
+                for act in actions:
+                    if not act.depends_on:
+                        act.depends_on = list(previous_ids)
+            previous_ids.extend(act.action_id for act in actions)
+
+        tree.recompute_ready()
 
     def _tool_hints(self, action: Any, capability_id: str | None = None) -> list[str]:
         """FakeCrewRunner-compatible tool calls derived from the routed capability.
@@ -572,20 +779,42 @@ class HiveOrchestrator:
         )
 
         if is_recon:
-            hints.append(f"scan_ports(target='{host}')")
-            hints.append(f"resolve_dns(hostname='{host}')")
-            if not self._is_ipv4(host):
+            # Precise per-output tooling: recon actions on the same host used to
+            # re-run scan_ports + ffuf each time (4 identical passes per round).
+            # service.exposed / asset.discovered -> port scan
+            # subdomain.discovered / asset.discovered -> DNS (+ subdomain enum)
+            if outputs & {"service.exposed", "asset.discovered"}:
+                hints.append(f"scan_ports(target='{host}')")
+            if outputs & {"asset.discovered", "subdomain.discovered"}:
+                hints.append(f"resolve_dns(hostname='{host}')")
+            if (
+                outputs & {"asset.discovered", "subdomain.discovered"}
+                and not self._is_ipv4(host)
+            ):
                 hints.append(f"enumerate_subdomains(domain='{host}')")
-            hints.append(f"discover_endpoints(base_url='{url}')")
+            if not hints:
+                # No declared outputs to key off — fall back to a light recon pass
+                hints.append(f"scan_ports(target='{host}')")
+                hints.append(f"discover_endpoints(base_url='{url}')")
             return list(dict.fromkeys(hints))
 
         if cap in ("framework-vuln", "component-vuln"):
-            hints.append(f"scan_fingerprints(target='{url}')")
-            hints.append(f"scan_vulnerabilities(target='{url}')")
+            for scan_url in self._scan_targets(url)[:3]:
+                hints.append(f"scan_fingerprints(target='{scan_url}')")
+                hints.append(
+                    f"scan_vulnerabilities(target='{scan_url}', "
+                    f"tags='cve,exposures,misconfig,default-login,auth-bypass')"
+                )
             return list(dict.fromkeys(hints))
 
         if cap == "web-attack":
-            hints.append(f"scan_vulnerabilities(target='{url}')")
+            # CVE coverage is handled by framework/component-vuln; keep this
+            # call lightweight so multiple services fit the time budget.
+            for scan_url in self._scan_targets(url)[:3]:
+                hints.append(
+                    f"scan_vulnerabilities(target='{scan_url}', "
+                    f"tags='sqli,xss,ssrf,ssti,lfi,rfi,redirect,cors,file-upload')"
+                )
             return list(dict.fromkeys(hints))
 
         if cap == "exploit-verifier":
@@ -600,6 +829,40 @@ class HiveOrchestrator:
         if "verif" in description or "验证" in description:
             hints.append(f"verify_sqli(url='{url}')")
         return list(dict.fromkeys(hints))
+
+    def _scan_targets(self, fallback: str) -> list[str]:
+        """URLs to scan: every discovered web-ish service, ordered by priority.
+
+        The planner only knows the seed target, so an action's own URL covers
+        one port at most.  Expanding here makes the executed scan cover every
+        service the recon phase found (8009 AJP, 9200 ElasticSearch, 8282
+        Tomcat, ...), while keeping a hard cap on how many get scanned.
+        """
+        blackboard = getattr(self, "_blackboard", None)
+        if blackboard is None:
+            return [fallback]
+
+        try:
+            facts = blackboard.snapshot(self._project_id)
+        except Exception:  # noqa: BLE001 - fall back to the action target
+            return [fallback]
+
+        urls: list[str] = []
+        for fact in facts:
+            if fact.fact_type != "service.exposed":
+                continue
+            port = fact.data.get("port")
+            name = str(fact.data.get("service_name") or "").lower()
+            if not isinstance(port, int):
+                continue
+            if name in ("https", "https-alt") or port == 443:
+                urls.append(f"https://{fact.asset_ref}:{port}")
+            elif name in ("http", "http-proxy", "http-alt") or port in _HTTP_PORT_HINTS:
+                urls.append(f"http://{fact.asset_ref}:{port}")
+
+        urls = list(dict.fromkeys(urls))
+        urls.sort(key=_scan_priority)
+        return urls[:3] or [fallback]
 
     @staticmethod
     def _host_and_url(target: str) -> tuple[str, str]:

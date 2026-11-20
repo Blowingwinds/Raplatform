@@ -29,6 +29,26 @@ _TECH_FINGERPRINT = "T1595"   # Active Scanning (fingerprint services)
 _TECH_VULN_SCAN = "T1190"     # Exploit Public-Facing Application
 _TECH_EXPLOIT_VERIFY = "T1210"  # Exploitation of Remote Services
 
+_DEFAULT_PORTS = {80, 443}
+
+
+def _host_of(ref: str) -> str:
+    """Normalise an asset ref to ``host[:non-default-port]`` for dedup.
+
+    ``http://10.0.0.5:80`` → ``10.0.0.5``；``10.0.0.5:22`` → ``10.0.0.5:22``。
+    """
+    value = ref.strip().lower()
+    if "://" in value:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(value)
+        host = parsed.hostname or value
+        port = parsed.port
+        if port in (None,) or port in _DEFAULT_PORTS:
+            return host
+        return f"{host}:{port}"
+    return value
+
 
 class ReOrchestrator:
     """Converts blackboard deltas into PTTTree mutations.
@@ -134,7 +154,15 @@ class ReOrchestrator:
         asset_ref: str,
         project_id: str,
     ) -> list[ActionContract]:
-        """Append a fingerprint/scan action for a new asset or service."""
+        """Append a fingerprint/scan action for a new asset or service.
+
+        Deduplicated per asset: service discovery emits one ``service.exposed``
+        event per port, so a 12-service host would otherwise append 12 identical
+        fingerprint nodes (each running a full nuclei batch).
+        """
+        if self._has_node_for(tree, "dyn-fingerprint-", asset_ref):
+            return []
+
         action_id = f"dyn-fingerprint-{uuid.uuid4().hex[:8]}"
         action = ActionContract(
             action_id=action_id,
@@ -164,7 +192,14 @@ class ReOrchestrator:
         asset_ref: str,
         project_id: str,
     ) -> list[ActionContract]:
-        """Append a vulnerability scan action after a fingerprint is detected."""
+        """Append a vulnerability scan action after a fingerprint is detected.
+
+        Deduplicated per asset — multiple fingerprints on one host share one
+        scan node (the node expands to every discovered service at execution).
+        """
+        if self._has_node_for(tree, "dyn-vuln-", asset_ref):
+            return []
+
         action_id = f"dyn-vuln-{uuid.uuid4().hex[:8]}"
         # Find the fingerprint action that detected this, if any
         parent_id = self._find_parent_action(tree, "fingerprint.detected", asset_ref)
@@ -196,7 +231,14 @@ class ReOrchestrator:
         asset_ref: str,
         project_id: str,
     ) -> list[ActionContract]:
-        """Append an exploit verification action for an unverified vulnerability."""
+        """Append an exploit verification action for an unverified vulnerability.
+
+        Deduplicated per target ref (host[:port]) — the same finding reported by
+        two nuclei templates must not create two verification nodes.
+        """
+        if self._has_node_for(tree, "dyn-exploit-", asset_ref):
+            return []
+
         action_id = f"dyn-exploit-{uuid.uuid4().hex[:8]}"
         parent_id = self._find_parent_action(tree, "vulnerability.detected", asset_ref)
         action = ActionContract(
@@ -241,6 +283,21 @@ class ReOrchestrator:
         return []
 
     # ── helpers ────────────────────────────────────────────────────────
+
+    def _has_node_for(self, tree: PTTTree, prefix: str, target_ref: str) -> bool:
+        """True when a dynamic node with *prefix* already targets the same host.
+
+        Dedup compares the host (default ports stripped), so repeated
+        ``service.exposed`` events for one host and the duplicate
+        ``http://h`` / ``http://h:80`` forms collapse into a single node.
+        """
+        host = _host_of(target_ref)
+        for node in tree.dynamic_nodes.values():
+            if not node.action.action_id.startswith(prefix):
+                continue
+            if any(_host_of(ref) == host for ref in node.action.target_refs):
+                return True
+        return False
 
     def _find_parent_action(
         self,

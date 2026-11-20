@@ -94,7 +94,7 @@ def _build_orchestrator(
 
     runner = FakeCrewRunner() if use_fake_runner else None
 
-    return HiveOrchestrator(
+    orch = HiveOrchestrator(
         store,
         project_id="proj-1",
         scope_id="scope-1",
@@ -103,6 +103,10 @@ def _build_orchestrator(
         transport=transport,
         crew_runner=runner,
     )
+    # Single-round orchestration tests: keep planner order untouched so each
+    # test's canned tool responses decide readiness, not tactic chaining.
+    orch._chain_tactics_in_order = lambda: None
+    return orch
 
 
 # ── tests ─────────────────────────────────────────────────────────────
