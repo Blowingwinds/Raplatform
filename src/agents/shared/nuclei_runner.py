@@ -13,7 +13,8 @@ from src.agents.shared.tool_paths import resolve_tool
 # Pass 1: technology fingerprinting (single Wappalyzer-style template)
 _TECH_IDS = "tech-detect"
 
-# Pass 2: vulnerability tags (P0 + P1 + config + CVE + custom)
+# Pass 2: default vulnerability tags (lightweight demo set; the heavy "cve"
+# tag is only pulled in via planner-driven tags for fingerprinted products)
 _VULN_TAGS = ",".join([
     # P0
     "sqli", "xss", "file-upload", "auth-bypass",
@@ -21,10 +22,6 @@ _VULN_TAGS = ",".join([
     "ssrf", "ssti", "lfi", "rfi", "redirect", "cors",
     # Config
     "exposures", "misconfig", "default-login",
-    # CVE (nuclei has 2000+ CVE templates — targeted by fingerprint context)
-    "cve",
-    # Custom
-    "injection", "rce",
 ])
 
 _SEVERITY_MAP = {
@@ -165,7 +162,7 @@ async def scan_fingerprints(targets: list[str], timeout: float = 120.0) -> list[
 async def scan_vulnerabilities(
     targets: list[str],
     fingerprints: list[dict] | None = None,
-    timeout: float = 300.0,
+    timeout: float = 600.0,
     tags: str | None = None,
 ) -> list[dict]:
     """Pass 2: run CVE + vuln templates.
@@ -173,11 +170,11 @@ async def scan_vulnerabilities(
     *fingerprints* are passed as context (consumed by Planner in phase 4-5,
     but also used here to optionally scope CVE templates to detected products).
     *tags* scopes the nuclei -tags selection (planner-driven precision strike);
-    defaults to the full vulnerability tag set.
+    defaults to the lightweight demo tag set (heavy tags like cve only via tags).
     """
     raw = await _run_nuclei(targets, tags=tags or _VULN_TAGS,
                             severity="critical,high,medium,low",
-                            timeout=timeout, concurrency=10)
+                            timeout=timeout, concurrency=20)
     results: list[dict] = []
     for entry in raw:
         results.append(_normalize_vuln(entry))
@@ -206,6 +203,7 @@ async def _run_nuclei(
     severity: str = "info,low,medium,high,critical",
     timeout: float = 120.0,
     concurrency: int = 15,
+    request_timeout: float = 30.0,
 ) -> list[dict]:
     nuclei_path = resolve_tool("nuclei")
     if nuclei_path is None:
@@ -227,7 +225,7 @@ async def _run_nuclei(
         "-jsonl",
         "-duc",  # disable update check (prevents network hang)
         "-no-mhe", "-no-interactsh",
-        "-timeout", str(int(timeout)),
+        "-timeout", str(int(request_timeout)),
         "-concurrency", str(concurrency),
     ]
     if ids is not None:

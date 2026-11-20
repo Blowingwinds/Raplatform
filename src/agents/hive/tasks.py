@@ -329,7 +329,9 @@ def make_vuln_tasks(
                 tasks.append(Task(
                     description=(
                         f"Broad vulnerability scan against: {broad_url}\n"
-                        f"Run scan_vulnerabilities(target='{broad_url}') using all default vulnerability tags.\n"
+                        f"Run scan_vulnerabilities(target='{broad_url}', "
+                        f"tags='cve,exposures,misconfig,default-login,auth-bypass,file-upload') "
+                        f"using the CVE and high-value exposure tags.\n"
                         f"Report each finding as a vulnerability.detected observation."
                     ),
                     expected_output="vulnerability.detected observations for all detected vulnerabilities",

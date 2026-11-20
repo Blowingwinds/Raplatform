@@ -111,8 +111,9 @@ async def scan_ports(
     target: str,
     ports: list[int] | None = None,
     *,
-    concurrency: int = 100,
+    concurrency: int = 40,
     timeout: float = 2.0,
+    retries: int = 1,
 ) -> list[dict]:
     if ports is None:
         ports = TOP_PORTS
@@ -121,7 +122,13 @@ async def scan_ports(
 
     async def _limited(port: int) -> PortResult:
         async with sem:
-            return await _scan_one_port(target, port, timeout=timeout)
+            result = await _scan_one_port(target, port, timeout=timeout)
+            # 高并发下偶发连接丢失——失败端口重试一次
+            for _ in range(retries):
+                if result.open:
+                    break
+                result = await _scan_one_port(target, port, timeout=timeout)
+            return result
 
     results = await asyncio.gather(*(_limited(p) for p in ports))
     open_ports = [r for r in results if r.open]
