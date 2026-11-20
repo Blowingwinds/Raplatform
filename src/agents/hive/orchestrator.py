@@ -191,18 +191,27 @@ class HiveOrchestrator:
         self._capabilities_registered = False
         self._tree: PTTTree | None = None
         self._scope: Scope | None = None
-        self._blocked_resume: dict[str, str] = {}  # action_id → resource_ref
+        self._blocked_resume: dict[str, tuple[str, str | None]] = {}  # action_id → (resource_ref, capability_id)
         # Phase 7 metrics
         self._metrics_actions: dict[str, int] = {"dispatched": 0, "succeeded": 0,
                                                    "failed": 0, "blocked": 0}
         self._metrics_lease_conflicts: int = 0
         self._metrics_hitle_requests: int = 0
         self._metrics_events: int = 0
+        # Concrete targets for the current run — used to resolve "*" refs
+        # produced by the planner (wildcard = "everything in scope").
+        self._seed_targets: list[str] = []
 
     # ── public API ─────────────────────────────────────────────────────
 
-    def run(self, seed_targets: list[str]) -> HiveRunSummary:
-        """Execute the full PTT-driven hive loop from seed to completion."""
+    def run(self, seed_targets: list[str], goal: str | None = None) -> HiveRunSummary:
+        """Execute the full PTT-driven hive loop from seed to completion.
+
+        *goal* is the natural-language intent handed to the planner.  When
+        omitted it is derived from the seed targets (recon-only by default);
+        pass e.g. "执行完整渗透测试" to plan recon + vuln detection + exploit.
+        """
+        self._seed_targets = list(seed_targets)
         self._ensure_capabilities()
         self._ensure_scope()
         self._open_session()
@@ -210,7 +219,7 @@ class HiveOrchestrator:
 
         # Generate initial PTT plan
         self._scope = self._store.get_scope(self._scope_id)
-        goal = self._derive_goal(seed_targets)
+        goal = goal or self._derive_goal(seed_targets)
         try:
             self._tree = self._planner.generate(
                 goal=goal,
@@ -255,6 +264,14 @@ class HiveOrchestrator:
             # ── re-orchestrate ──
             if events:
                 self._reorch.react(self._tree, events, self._project_id)
+
+                # ── topology projection: persist network.relation facts ──
+                try:
+                    self._topology.emit_relations(
+                        self._project_id, session_id=self._session_id,
+                    )
+                except Exception as exc:
+                    logger.warning("Topology projection failed: %s", exc)
 
             # ── retry blocked-by-lease actions ──
             self._retry_blocked_leases()
@@ -311,20 +328,21 @@ class HiveOrchestrator:
                     self._metrics_actions["blocked"] += 1
                     continue
 
-                # Lease: acquire resource
-                resource_ref = action.target_refs[0] if action.target_refs else self._scope_id
+                # Lease: acquire resource (target:port granularity)
+                resource_ref = self._lease_resource_ref(action, self._seed_targets)
                 lease_result = self._lease.acquire(
                     project_id=self._project_id,
                     resource_ref=resource_ref,
                     session_id=self._session_id,
                     action_id=action.action_id,
+                    capability_id=decision.capability_id,
                 )
                 if not lease_result.acquired:
                     self._tree.mark_blocked(
                         action.action_id,
                         reason=f"lease conflict on {resource_ref}",
                     )
-                    self._blocked_resume[action.action_id] = resource_ref
+                    self._blocked_resume[action.action_id] = (resource_ref, decision.capability_id)
                     self._metrics_actions["blocked"] += 1
                     self._metrics_lease_conflicts += 1
                     continue
@@ -416,12 +434,18 @@ class HiveOrchestrator:
 
         # Assign a single task with the action's description
         from crewai import Task
+        hints = self._tool_hints(action, capability_id)
+        hint_block = (
+            "\n\nUse these tools in order:\n"
+            + "\n".join(f"{i}. {h}" for i, h in enumerate(hints, 1))
+            if hints else ""
+        )
         task_desc = (
             f"{action.description}\n"
             f"Target: {', '.join(action.target_refs)}\n"
             f"Expected outputs: {', '.join(action.expected_outputs)}"
+            f"{hint_block}"
         )
-        # For FakeCrewRunner compatibility, include tool hints
         crew.tasks = [
             Task(
                 description=task_desc,
@@ -440,12 +464,13 @@ class HiveOrchestrator:
         if not self._blocked_resume:
             return
         resumed: list[str] = []
-        for action_id, resource_ref in self._blocked_resume.items():
+        for action_id, (resource_ref, capability_id) in self._blocked_resume.items():
             lease_result = self._lease.acquire(
                 project_id=self._project_id,
                 resource_ref=resource_ref,
                 session_id=self._session_id,
                 action_id=action_id,
+                capability_id=capability_id,
             )
             if lease_result.acquired:
                 # Set back to READY from BLOCKED
@@ -453,6 +478,120 @@ class HiveOrchestrator:
                 resumed.append(action_id)
         for aid in resumed:
             del self._blocked_resume[aid]
+
+    @staticmethod
+    def _lease_resource_ref(action: Any, fallback_targets: list[str] | None = None) -> str:
+        """Derive a port-level lease key from the action's first target ref.
+
+        ``http://10.0.0.5:8080/x`` -> ``10.0.0.5:8080``
+        ``10.0.0.5:22`` -> ``10.0.0.5:22`` (kept as-is)
+        ``10.0.0.5`` -> ``10.0.0.5`` (target-level fallback)
+        ``"*"`` or empty -> first of *fallback_targets* (concrete seed targets)
+        """
+        target_refs = [
+            r for r in (getattr(action, "target_refs", None) or [])
+            if r and r != "*"
+        ]
+        if not target_refs:
+            target_refs = list(fallback_targets or [])
+        target = target_refs[0] if target_refs else ""
+        if not target:
+            return "unscoped"
+        if "://" in target:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(target)
+            host = parsed.hostname or target
+            port = parsed.port
+            if port is None:
+                port = 443 if parsed.scheme == "https" else 80
+            return f"{host}:{port}"
+        return target
+
+    def _resolve_targets(self, action: Any) -> list[str]:
+        """Resolve planner wildcard target refs (``"*"``) to concrete seed targets."""
+        refs = [
+            r for r in (getattr(action, "target_refs", None) or [])
+            if r and r != "*"
+        ]
+        if refs:
+            return refs
+        return list(self._seed_targets)
+
+    def _tool_hints(self, action: Any, capability_id: str | None = None) -> list[str]:
+        """FakeCrewRunner-compatible tool calls derived from the routed capability.
+
+        The runner extracts ``tool_name(k='v')`` patterns from the task text,
+        so an action description without hints produces no tool calls and no
+        evidence.  Hints mirror what a real LLM would choose for the same
+        capability; ``"*"`` target refs resolve to this run's seed targets.
+        """
+        targets = self._resolve_targets(action)
+        if not targets:
+            return []
+        target = targets[0]
+
+        host, url = self._host_and_url(target)
+        outputs = set(getattr(action, "expected_outputs", []) or [])
+        description = str(getattr(action, "description", "")).lower()
+        hints: list[str] = []
+
+        cap = capability_id or ""
+        is_recon = cap == "info-gatherer" or (
+            not cap and outputs & {"service.exposed", "asset.discovered", "subdomain.discovered"}
+        )
+
+        if is_recon:
+            hints.append(f"scan_ports(target='{host}')")
+            hints.append(f"resolve_dns(hostname='{host}')")
+            if not self._is_ipv4(host):
+                hints.append(f"enumerate_subdomains(domain='{host}')")
+            hints.append(f"discover_endpoints(base_url='{url}')")
+            return list(dict.fromkeys(hints))
+
+        if cap in ("framework-vuln", "component-vuln"):
+            hints.append(f"scan_fingerprints(target='{url}')")
+            hints.append(f"scan_vulnerabilities(target='{url}')")
+            return list(dict.fromkeys(hints))
+
+        if cap == "web-attack":
+            hints.append(f"scan_vulnerabilities(target='{url}')")
+            return list(dict.fromkeys(hints))
+
+        if cap == "exploit-verifier":
+            hints.append(f"verify_sqli(url='{url}')")
+            return list(dict.fromkeys(hints))
+
+        # No capability (direct dispatch in tests) — fall back to output inference
+        if "fingerprint.detected" in outputs:
+            hints.append(f"scan_fingerprints(target='{url}')")
+        if "vulnerability.detected" in outputs:
+            hints.append(f"scan_vulnerabilities(target='{url}')")
+        if "verif" in description or "验证" in description:
+            hints.append(f"verify_sqli(url='{url}')")
+        return list(dict.fromkeys(hints))
+
+    @staticmethod
+    def _host_and_url(target: str) -> tuple[str, str]:
+        """Split a target ref into (host, http_url) for tool hints."""
+        if "://" in target:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(target)
+            return parsed.hostname or target, target
+        if ":" in target and target.rsplit(":", 1)[-1].isdigit():
+            return target.rsplit(":", 1)[0], f"http://{target}"
+        return target, f"http://{target}"
+
+    @staticmethod
+    def _is_ipv4(value: str) -> bool:
+        import ipaddress
+
+        try:
+            ipaddress.IPv4Address(value)
+            return True
+        except ValueError:
+            return False
 
     def _infer_target_type(self, action: Any) -> str:
         """Infer a target_type string from action's technique and target_refs."""

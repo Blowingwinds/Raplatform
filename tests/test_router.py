@@ -133,16 +133,45 @@ class TestRouter:
             target_types=["url"],
             max_concurrency=1,
         ))
-        # Acquire one active lease — active_count_for_capability counts all
-        # active leases, so this puts every max_concurrency=1 cap at its limit.
+        # Put BOTH capabilities at their limit — quotas are per-capability.
         lease.acquire(
-            project_id="p1", resource_ref="example.com",
-            session_id="s-other", action_id="act-other",
+            project_id="p1", resource_ref="a:80",
+            session_id="s-other", action_id="act-a",
+            capability_id="cap-a",
+        )
+        lease.acquire(
+            project_id="p1", resource_ref="b:80",
+            session_id="s-other", action_id="act-b",
+            capability_id="cap-b",
         )
         decision = router.route(_action(), target_type="url", session_id="s1")
         assert decision.deferred is True
         # A capability id is still reported (the highest-scoring blocked one).
         assert decision.capability_id in {"cap-a", "cap-b"}
+
+    def test_other_capability_load_does_not_block(self, router, registry, lease):
+        """4b. A busy *unrelated* capability must not count against this one."""
+        registry.register(_cap(
+            capability_id="cap-a",
+            techniques=["T1046"],
+            target_types=["url"],
+            max_concurrency=1,
+        ))
+        registry.register(_cap(
+            capability_id="cap-b",
+            techniques=["T1046"],
+            target_types=["url"],
+            max_concurrency=1,
+        ))
+        # cap-a is at its limit; cap-b is free.
+        lease.acquire(
+            project_id="p1", resource_ref="x:80",
+            session_id="s-other", action_id="act-x",
+            capability_id="cap-a",
+        )
+        decision = router.route(_action(), target_type="url", session_id="s1")
+        assert decision.deferred is False
+        assert decision.capability_id == "cap-b"
 
     def test_risk_gate_filters_out_over_risk_capabilities(self, router, registry):
         """5. A cap whose risk_level exceeds the action's is filtered out."""

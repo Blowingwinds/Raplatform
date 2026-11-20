@@ -29,7 +29,7 @@ def store():
 def _build_orch(store, **kw):
     """Build a HiveOrchestrator with FakeCrewRunner for testing."""
     runner = FakeCrewRunner()
-    return HiveOrchestrator(
+    orch = HiveOrchestrator(
         store,
         project_id=kw.get("project_id", "proj-e2e"),
         scope_id=kw.get("scope_id", "scope-e2e"),
@@ -38,6 +38,10 @@ def _build_orch(store, **kw):
         crew_runner=runner,
         demo_mode=kw.get("demo_mode", True),
     )
+    # These tests exercise the orchestration pipeline; keep them offline by
+    # disabling tool hints (real scanners are covered by unit tests).
+    orch._tool_hints = lambda action, capability_id=None: []
+    return orch
 
 
 class TestEndToEnd:

@@ -107,3 +107,45 @@ class TestLeaseSweep:
         assert swept == 1
         held = svc.is_held("p1", "x.com")
         assert held is None
+
+
+class TestCapabilityQuota:
+    """active_count_for_capability must count only the requested capability."""
+
+    def test_counts_only_matching_capability(self, svc):
+        svc.acquire(project_id="p1", resource_ref="a:80", session_id="s1",
+                    action_id="act-a", capability_id="info-gatherer")
+        svc.acquire(project_id="p1", resource_ref="b:80", session_id="s1",
+                    action_id="act-b", capability_id="web-attack")
+        assert svc.active_count_for_capability("info-gatherer") == 1
+        assert svc.active_count_for_capability("web-attack") == 1
+        assert svc.active_count_for_capability("framework-vuln") == 0
+
+    def test_leases_without_capability_ignored(self, svc):
+        svc.acquire(project_id="p1", resource_ref="a:80",
+                    session_id="s1", action_id="act-a")
+        assert svc.active_count_for_capability("info-gatherer") == 0
+
+    def test_expired_lease_not_counted(self, svc, store):
+        import json
+
+        r = svc.acquire(project_id="p1", resource_ref="a:80", session_id="s1",
+                        action_id="act-a", capability_id="info-gatherer")
+        r.lease.expires_at = datetime.now(timezone.utc) - timedelta(seconds=5)
+        store.update_lease(r.lease)
+        assert svc.active_count_for_capability("info-gatherer") == 0
+
+    def test_project_filter(self, svc):
+        svc.acquire(project_id="p1", resource_ref="a:80", session_id="s1",
+                    action_id="act-a", capability_id="info-gatherer")
+        svc.acquire(project_id="p2", resource_ref="b:80", session_id="s2",
+                    action_id="act-b", capability_id="info-gatherer")
+        assert svc.active_count_for_capability("info-gatherer", project_id="p1") == 1
+        assert svc.active_count_for_capability("info-gatherer") == 2
+
+    def test_release_decrements_count(self, svc):
+        r = svc.acquire(project_id="p1", resource_ref="a:80", session_id="s1",
+                        action_id="act-a", capability_id="info-gatherer")
+        assert svc.active_count_for_capability("info-gatherer") == 1
+        svc.release(r.lease.lease_id)
+        assert svc.active_count_for_capability("info-gatherer") == 0

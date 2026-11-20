@@ -35,7 +35,7 @@ def store():
 def _setup_orchestrator(store, *, demo_mode=True, max_rounds=6):
     """Build a HiveOrchestrator for integration testing."""
     runner = FakeCrewRunner()
-    return HiveOrchestrator(
+    orch = HiveOrchestrator(
         store,
         project_id="proj-int",
         scope_id="scope-int",
@@ -44,6 +44,9 @@ def _setup_orchestrator(store, *, demo_mode=True, max_rounds=6):
         crew_runner=runner,
         demo_mode=demo_mode,
     )
+    # Orchestration-only tests: disable tool hints so no real scanner runs.
+    orch._tool_hints = lambda action, capability_id=None: []
+    return orch
 
 
 class TestPhase5Integration:

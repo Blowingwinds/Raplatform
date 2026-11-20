@@ -43,12 +43,13 @@ def cmd_scan(args: argparse.Namespace) -> None:
 
     targets = [t.strip() for t in args.target.split(",") if t.strip()]
     print(f"Targets : {', '.join(targets)}")
+    print(f"Goal    : {args.goal or '(derived from targets)'}")
     print(f"Rounds  : {args.rounds}")
     print(f"Project : {args.project}")
     print(f"Mode    : {'demo (auto-approve)' if not args.no_demo else 'HITL (approval required)'}")
     print("-" * 50)
 
-    summary = orch.run(seed_targets=targets)
+    summary = orch.run(seed_targets=targets, goal=args.goal)
 
     print("-" * 50)
     print(f"Status  : {summary.final_phase.value}")
@@ -510,6 +511,9 @@ def main() -> None:
     p_scan = sub.add_parser("scan", help="Run a penetration test")
     p_scan.add_argument("--target", "-t", default="127.0.0.1",
                         help="Target IP, hostname, or comma-separated list")
+    p_scan.add_argument("--goal", default=None,
+                        help="Natural-language goal for the PTT planner "
+                             "(e.g. '执行完整渗透测试'; default: derive from targets)")
     p_scan.add_argument("--project", default="default",
                         help="Project ID (default: default)")
     p_scan.add_argument("--scope", default="default-scope",

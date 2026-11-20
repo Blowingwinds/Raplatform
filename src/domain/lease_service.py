@@ -52,6 +52,7 @@ class LeaseService:
         session_id: str,
         action_id: str,
         ttl_seconds: int = 600,
+        capability_id: str | None = None,
     ) -> LeaseAcquireResult:
         """Try to acquire a lease on a resource. Returns decision + lease or conflict."""
         # Check for existing active leases on this resource
@@ -65,6 +66,8 @@ class LeaseService:
         for active_lease in active:
             if active_lease.holder_session_id == session_id:
                 active_lease.expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+                if capability_id:
+                    active_lease.capability_id = capability_id
                 self._store.update_lease(active_lease)
                 return LeaseAcquireResult(
                     acquired=True, lease=active_lease, strategy="renewed",
@@ -83,6 +86,7 @@ class LeaseService:
             resource_ref=resource_ref,
             holder_session_id=session_id,
             action_id=action_id,
+            capability_id=capability_id,
             expires_at=datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds),
             status=LeaseStatus.ACTIVE,
         )
@@ -99,14 +103,7 @@ class LeaseService:
 
     def release_for_action(self, action_id: str) -> None:
         """Release all leases held by a specific action."""
-        # We need to scan leases — use list_leases as a fallback
-        # (storage doesn't index by action_id, so we scan)
-        # Actually, let's list all and filter
-        rows = self._store._connection.execute("SELECT payload FROM leases").fetchall()
-        import json
-        from src.domain.models import Lease as LeaseModel
-        for row in rows:
-            lease = LeaseModel.model_validate(json.loads(row["payload"]))
+        for lease in self._store.list_all_leases():
             if lease.action_id == action_id and lease.status == LeaseStatus.ACTIVE:
                 lease.status = LeaseStatus.RELEASED
                 self._store.update_lease(lease)
@@ -131,31 +128,31 @@ class LeaseService:
         ]
         return active[0] if active else None
 
-    def active_count_for_capability(self, capability_id: str) -> int:
-        """Count active leases held by a specific agent capability."""
-        # Scan all leases — capability_id is embedded as action prefix
-        # Actually, we'll count by checking all active leases
-        import json
-        rows = self._store._connection.execute("SELECT payload FROM leases").fetchall()
-        from src.domain.models import Lease as LeaseModel
+    def active_count_for_capability(
+        self, capability_id: str, project_id: str | None = None,
+    ) -> int:
+        """Count active, unexpired leases genuinely held by *capability_id*.
+
+        Leases carry an explicit ``capability_id`` set at acquire time; leases
+        without one are ignored so unrelated holds never inflate the count.
+        """
         now = datetime.now(timezone.utc)
         count = 0
-        for row in rows:
-            lease = LeaseModel.model_validate(json.loads(row["payload"]))
-            if lease.status == LeaseStatus.ACTIVE and lease.expires_at > now:
-                # action_id prefix maps to capability (e.g., "info-gatherer-*")
-                count += 1
+        for lease in self._store.list_all_leases():
+            if lease.status != LeaseStatus.ACTIVE or lease.expires_at <= now:
+                continue
+            if lease.capability_id != capability_id:
+                continue
+            if project_id is not None and lease.project_id != project_id:
+                continue
+            count += 1
         return count
 
     def sweep_expired(self) -> int:
         """Mark all expired leases as EXPIRED. Returns count swept."""
-        import json
-        rows = self._store._connection.execute("SELECT payload FROM leases").fetchall()
-        from src.domain.models import Lease as LeaseModel
         now = datetime.now(timezone.utc)
         swept = 0
-        for row in rows:
-            lease = LeaseModel.model_validate(json.loads(row["payload"]))
+        for lease in self._store.list_all_leases():
             if lease.status == LeaseStatus.ACTIVE and lease.expires_at <= now:
                 lease.status = LeaseStatus.EXPIRED
                 self._store.update_lease(lease)

@@ -270,6 +270,11 @@ class SQLiteStore:
             if (lease := Lease.model_validate(json.loads(row["payload"]))).project_id == project_id
         ]
 
+    def list_all_leases(self) -> list[Lease]:
+        """Return every lease row regardless of project (service-level sweeps)."""
+        rows = self._connection.execute("SELECT payload FROM leases").fetchall()
+        return [Lease.model_validate(json.loads(row["payload"])) for row in rows]
+
     # ── approval methods ───────────────────────────────────────────────────
 
     def save_approval(self, request: ApprovalRequest) -> None:

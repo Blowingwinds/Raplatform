@@ -5,10 +5,11 @@ facts into a graph that planners can walk to find unscanned services or
 unverified vulnerabilities.
 """
 
+import uuid
 from dataclasses import dataclass, field
 
 from src.blackboard.service import BlackboardService
-from src.domain.models import BlackboardFact
+from src.domain.models import BlackboardFact, Evidence
 
 
 @dataclass
@@ -127,6 +128,9 @@ class TopologyService:
 
     def __init__(self, blackboard: BlackboardService) -> None:
         self.blackboard = blackboard
+        # Edge set from the last persisted projection — guards against
+        # re-publishing unchanged relations every round (event storms).
+        self._last_edges: set[tuple[str, str]] | None = None
 
     def build(self, project_id: str) -> TopologyGraph:
         """Build a topology graph from all blackboard facts.
@@ -225,3 +229,48 @@ class TopologyService:
                     seen.add(fact.asset_ref)
                     refs.append(fact.asset_ref)
         return refs
+
+    def emit_relations(
+        self, project_id: str, *, session_id: str = "topology-projection",
+    ) -> int:
+        """Persist graph edges as ``network.relation`` blackboard facts.
+
+        Only publishes when the edge set actually changed since the previous
+        projection, so repeated rounds do not flood the blackboard with
+        fact.updated events.  Returns the number of relations published.
+        """
+        graph = self.build(project_id)
+        edge_set = set(graph.edges)
+        if edge_set == self._last_edges:
+            return 0
+        self._last_edges = edge_set
+
+        observations = [
+            {
+                "fact_type": "network.relation",
+                "asset_ref": parent_ref,
+                "data": {
+                    "relation": "link",
+                    "peer_ref": child_ref,
+                    "source": "topology_projection",
+                },
+                "identity": {"relation": "link", "peer_ref": child_ref},
+                "confidence": 0.95,
+                "state": "active",
+            }
+            for parent_ref, child_ref in graph.edges
+        ]
+        if not observations:
+            return 0
+
+        evidence = Evidence(
+            evidence_id=f"ev-topo-{uuid.uuid4().hex[:12]}",
+            project_id=project_id,
+            session_id=session_id,
+            task_id="topology-projection",
+            agent_id="network-topology",
+            kind="agent.result",
+            raw_payload={"observations": observations},
+        )
+        self.blackboard.ingest_result(evidence)
+        return len(observations)

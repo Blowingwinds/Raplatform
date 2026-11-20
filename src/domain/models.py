@@ -95,6 +95,7 @@ class Lease(DomainModel):
     expires_at: datetime
     status: LeaseStatus = LeaseStatus.ACTIVE
     action_id: str | None = None
+    capability_id: str | None = None
     acquired_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

@@ -303,3 +303,51 @@ def test_to_mermaid_generates_flowchart():
     assert mermaid.endswith("```")
     # Should contain edge between asset and service
     assert " --> " in mermaid
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Test 8: emit_relations() persists network.relation facts (idempotent)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_emit_relations_persists_network_relation_facts():
+    service = _make_service()
+    _ingest(service, [
+        _service_observation("asset:10.0.0.2", "tcp", 8080),
+    ])
+
+    topo = TopologyService(service)
+    published = topo.emit_relations(PROJECT_ID)
+
+    assert published >= 1
+    facts = service.snapshot(PROJECT_ID)
+    relations = [f for f in facts if f.fact_type == "network.relation"]
+    assert relations, "expected network.relation facts on the blackboard"
+    assert all(r.data.get("peer_ref") for r in relations)
+    assert all(r.data.get("relation") == "link" for r in relations)
+
+
+def test_emit_relations_skips_unchanged_graph():
+    service = _make_service()
+    _ingest(service, [
+        _service_observation("asset:10.0.0.3", "tcp", 22),
+    ])
+
+    topo = TopologyService(service)
+    first = topo.emit_relations(PROJECT_ID)
+    second = topo.emit_relations(PROJECT_ID)
+
+    assert first >= 1
+    assert second == 0  # unchanged edge set → no republish, no event storm
+
+
+def test_emit_relations_publishes_after_topology_change():
+    service = _make_service()
+    _ingest(service, [_service_observation("asset:10.0.0.4", "tcp", 80)])
+
+    topo = TopologyService(service)
+    assert topo.emit_relations(PROJECT_ID) >= 1
+
+    # A new service appears → edge set changes → republish
+    _ingest(service, [_service_observation("asset:10.0.0.4", "tcp", 443)])
+    assert topo.emit_relations(PROJECT_ID) >= 1
