@@ -110,64 +110,94 @@ class MockProvider:
 
     def _build_plan(self, scenario: dict[str, Any], request: PlanRequest) -> PTTPlan:
         """Convert a scenario dict into a validated PTTPlan."""
-        import uuid
-
-        plan_data = scenario["plan"]
-        tactics: list[TacticNode] = []
-
-        for t_data in plan_data.get("tactics", []):
-            techniques: list[TechniqueNode] = []
-            for tech_data in t_data.get("techniques", []):
-                actions: list[ActionContract] = []
-                for act_data in tech_data.get("actions", []):
-                    # Resolve '*' target_refs to scope target
-                    resolved_targets = self._resolve_targets(
-                        act_data.get("target_refs", ["*"]), request.scope
-                    )
-                    actions.append(ActionContract(
-                        action_id=act_data["action_id"],
-                        name=act_data["name"],
-                        description=act_data.get("description", ""),
-                        technique_id=act_data["technique_id"],
-                        target_refs=resolved_targets,
-                        expected_outputs=act_data.get("expected_outputs", []),
-                        risk_level=act_data.get("risk_level", "low"),
-                        side_effects=act_data.get("side_effects", []),
-                        stop_conditions=act_data.get("stop_conditions", []),
-                    ))
-                if actions:
-                    techniques.append(TechniqueNode(
-                        technique_id=tech_data["technique_id"],
-                        name=tech_data.get("name", tech_data["technique_id"]),
-                        actions=actions,
-                    ))
-            if techniques:
-                tactics.append(TacticNode(
-                    tactic_id=t_data["tactic_id"],
-                    name=t_data.get("name", t_data["tactic_id"]),
-                    techniques=techniques,
-                ))
-
-        return PTTPlan(
-            plan_id=f"plan-{uuid.uuid4().hex[:12]}",
-            goal=request.goal,
-            normalized_goal=plan_data.get("goal", request.goal),
-            project_id=request.project_id,
-            scope_id=request.scope.scope_id,
-            tactics=tactics,
-            generated_by="mock",
+        return plan_from_dict(
+            scenario["plan"], request, generated_by="mock",
         )
 
-    @staticmethod
-    def _resolve_targets(target_refs: list[str], scope: Scope) -> list[str]:
-        """Replace '*' wildcard with actual scope target."""
-        resolved: list[str] = []
-        for ref in target_refs:
-            if ref == "*":
-                resolved.append(scope.target)
-            else:
-                resolved.append(ref)
-        return resolved
+
+# ── shared plan construction ────────────────────────────────────────────
+
+def plan_from_dict(
+    plan_data: dict[str, Any],
+    request: PlanRequest,
+    *,
+    generated_by: str = "mock",
+) -> PTTPlan:
+    """Build a PTTPlan from a plan-shaped dict.
+
+    Shared by ``MockProvider`` (scenario templates) and the LLM provider
+    (model JSON output), so both go through identical normalisation:
+    wildcard target resolution, missing-field defaults, and per-action
+    technique inheritance.
+
+    Raises ``ValueError`` for structurally unusable input — callers decide
+    whether to retry or reject.
+    """
+    import uuid
+
+    tactics: list[TacticNode] = []
+
+    for t_data in plan_data.get("tactics", []) or []:
+        techniques: list[TechniqueNode] = []
+        for tech_data in t_data.get("techniques", []) or []:
+            technique_id = tech_data.get("technique_id")
+            if not technique_id:
+                raise ValueError("technique node is missing technique_id")
+
+            actions: list[ActionContract] = []
+            for act_data in tech_data.get("actions", []) or []:
+                action_id = act_data.get("action_id")
+                if not action_id:
+                    raise ValueError(
+                        f"action under {technique_id} is missing action_id",
+                    )
+                actions.append(ActionContract(
+                    action_id=action_id,
+                    name=act_data.get("name") or action_id,
+                    description=act_data.get("description", ""),
+                    # Actions inherit the enclosing technique when omitted
+                    technique_id=act_data.get("technique_id") or technique_id,
+                    target_refs=_resolve_targets(
+                        act_data.get("target_refs") or ["*"], request.scope,
+                    ),
+                    expected_outputs=act_data.get("expected_outputs") or [],
+                    risk_level=act_data.get("risk_level") or "low",
+                    side_effects=act_data.get("side_effects") or [],
+                    stop_conditions=act_data.get("stop_conditions") or [],
+                ))
+            if actions:
+                techniques.append(TechniqueNode(
+                    technique_id=technique_id,
+                    name=tech_data.get("name") or technique_id,
+                    actions=actions,
+                ))
+        if techniques:
+            tactics.append(TacticNode(
+                tactic_id=t_data.get("tactic_id") or "unknown",
+                name=t_data.get("name") or t_data.get("tactic_id") or "Unknown",
+                techniques=techniques,
+            ))
+
+    if not tactics:
+        raise ValueError("plan contains no usable tactics")
+
+    return PTTPlan(
+        plan_id=f"plan-{uuid.uuid4().hex[:12]}",
+        goal=request.goal,
+        normalized_goal=plan_data.get("goal") or request.goal,
+        project_id=request.project_id,
+        scope_id=request.scope.scope_id,
+        tactics=tactics,
+        generated_by=generated_by,
+    )
+
+
+def _resolve_targets(target_refs: list[str], scope: Scope) -> list[str]:
+    """Replace '*' wildcard with the actual scope target."""
+    resolved: list[str] = []
+    for ref in target_refs:
+        resolved.append(scope.target if ref == "*" else ref)
+    return resolved
 
 
 # ── helper: match to tree ────────────────────────────────────────────────

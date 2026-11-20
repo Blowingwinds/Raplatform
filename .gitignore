@@ -5,3 +5,9 @@ __pycache__/
 *.db
 *.sqlite
 *.sqlite3
+
+# ── secrets / local config (never commit) ──
+.env
+.env.*
+!.env.example
+*.local.json

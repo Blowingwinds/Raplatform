@@ -30,6 +30,20 @@ _RISK_ORDER = {
     RiskLevel.HIGH: 2, RiskLevel.CRITICAL: 3,
 }
 
+# Fact types an action may declare in expected_outputs.
+# Must stay a superset of ``blackboard.normalizer.IDENTITY_FIELDS`` (the types
+# the blackboard can actually persist) — otherwise a plan passes planning and
+# then silently loses facts at ingestion.
+ALLOWED_FACT_TYPES: frozenset[str] = frozenset({
+    "asset.discovered",
+    "subdomain.discovered",
+    "service.exposed",
+    "network.relation",
+    "fingerprint.detected",
+    "vulnerability.detected",
+    "credential.validated",
+})
+
 
 class PTTValidator:
     """Validates a PTT plan against ATT&CK knowledge, scope, risk, and capability rules.
@@ -188,10 +202,7 @@ class PTTValidator:
         self, plan: PTTPlan, errors: list[ValidationError],
     ) -> None:
         """Semantic checks on expected_outputs beyond Pydantic's non-empty check."""
-        valid_fact_types = {
-            "asset.discovered", "service.exposed", "subdomain.discovered",
-            "fingerprint.detected", "vulnerability.detected", "credential.captured",
-        }
+        valid_fact_types = ALLOWED_FACT_TYPES
         for i, tactic in enumerate(plan.tactics):
             for j, technique in enumerate(tactic.techniques):
                 for k, action in enumerate(technique.actions):

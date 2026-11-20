@@ -205,7 +205,7 @@ class ReOrchestrator:
             description=f"对 {asset_ref} 上发现的漏洞执行受控验证",
             technique_id=_TECH_EXPLOIT_VERIFY,
             target_refs=[asset_ref],
-            expected_outputs=["vulnerability.detected", "credential.captured"],
+            expected_outputs=["vulnerability.detected", "credential.validated"],
             risk_level=RiskLevel.HIGH,
             side_effects=["可能修改目标状态", "需要人工审批"],
             stop_conditions=["完成验证", "超时 120s"],

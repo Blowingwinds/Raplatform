@@ -257,7 +257,7 @@
                     "description": "对已发现的漏洞执行受控验证，确认漏洞真实存在",
                     "technique_id": "T1059",
                     "target_refs": ["*"],
-                    "expected_outputs": ["vulnerability.detected", "credential.captured"],
+                    "expected_outputs": ["vulnerability.detected", "credential.validated"],
                     "risk_level": "high",
                     "side_effects": ["可能修改目标状态", "需要人工审批"],
                     "stop_conditions": ["完成验证", "触发安全设备告警时暂停", "超时 120s"]

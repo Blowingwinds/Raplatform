@@ -530,7 +530,7 @@ class TestPTTTree:
                                 action_id="a3", name="A3",
                                 description="Dep on a2", technique_id="T1210",
                                 target_refs=["*"],
-                                expected_outputs=["credential.captured"],
+                                expected_outputs=["credential.validated"],
                                 risk_level=RiskLevel.HIGH,
                                 depends_on=["a2"],
                             ),

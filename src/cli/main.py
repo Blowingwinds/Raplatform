@@ -23,12 +23,28 @@ from src.agents.capabilities import register_default_capabilities
 from src.agents.hive import FakeCrewRunner, HiveOrchestrator, HivePhase
 from src.blackboard.service import BlackboardService
 from src.domain.storage import SQLiteStore
+from src.planner.planner import Planner
+from src.planner.providers import LLMProvider, LLMProviderError
+
+
+def _build_planner(store: SQLiteStore, provider_name: str) -> Planner | None:
+    """Construct a Planner for the requested provider (None keeps the default)."""
+    if provider_name != "llm":
+        return None
+    try:
+        llm = LLMProvider()
+    except LLMProviderError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+    print(f"Provider: LLM — {llm._config.describe()}")  # noqa: SLF001 (CLI display)
+    return Planner(store, provider=llm)
 
 
 def cmd_scan(args: argparse.Namespace) -> None:
     """Run a penetration test against target(s)."""
     store = SQLiteStore(args.db)
     runner = FakeCrewRunner(verbose=args.verbose)
+    planner = _build_planner(store, args.provider)
 
     orch = HiveOrchestrator(
         store,
@@ -37,6 +53,7 @@ def cmd_scan(args: argparse.Namespace) -> None:
         session_id=args.session,
         max_rounds=args.rounds,
         crew_runner=runner,
+        planner=planner,
         verbose=args.verbose,
         demo_mode=not args.no_demo,
     )
@@ -439,7 +456,7 @@ def cmd_plan(args: argparse.Namespace) -> None:
     # Register default capabilities for technique matching
     register_default_capabilities(registry)
 
-    planner = Planner(store)
+    planner = _build_planner(store, args.provider) or Planner(store)
 
     try:
         tree = planner.generate(args.goal, scope, registry, project_id=args.project)
@@ -506,6 +523,8 @@ def main() -> None:
                         help="SQLite database path (default: :memory:)")
     p_plan.add_argument("--output", "-o", default=None,
                         help="Write plan JSON to file instead of printing summary")
+    p_plan.add_argument("--provider", choices=("mock", "llm"), default="mock",
+                        help="PTT planner backend (default: mock; 'llm' uses .env config)")
 
     # ── scan ──
     p_scan = sub.add_parser("scan", help="Run a penetration test")
@@ -514,6 +533,8 @@ def main() -> None:
     p_scan.add_argument("--goal", default=None,
                         help="Natural-language goal for the PTT planner "
                              "(e.g. '执行完整渗透测试'; default: derive from targets)")
+    p_scan.add_argument("--provider", choices=("mock", "llm"), default="mock",
+                        help="PTT planner backend (default: mock; 'llm' uses .env config)")
     p_scan.add_argument("--project", default="default",
                         help="Project ID (default: default)")
     p_scan.add_argument("--scope", default="default-scope",

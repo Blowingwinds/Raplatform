@@ -41,11 +41,15 @@ class PolicyGuard:
 # helpers
 # ------------------------------------------------------------------
 def _target_matches_scope(target: str, scope: Scope) -> bool:
-    """Naive scope matching: exact match or suffix match (for subdomains)."""
+    """Naive scope matching: wildcard, exact match, or suffix match (subdomains)."""
     if not target:
         return False
     target_lower = target.strip().lower()
     scope_lower = scope.target.strip().lower()
+
+    # Wildcard scope — the auto-created per-run scope authorizes its seed targets
+    if scope_lower == "*":
+        return True
 
     if target_lower == scope_lower:
         return True

@@ -228,16 +228,46 @@ class HiveOrchestrator:
                 project_id=self._project_id,
             )
         except Exception as exc:
-            logger.warning("Plan generation failed: %s — falling back to empty tree", exc)
-            # Fallback: empty PTTTree with no actions — rely on re-orchestrator
-            from src.planner.ptt_schema import PTTPlan
+            logger.warning("Plan generation failed: %s — falling back to a minimal recon plan", exc)
+            # Fallback: one合法最小侦察动作，保证蜂群仍能降级跑通
+            # （PTTPlan 要求 tactics/techniques/actions 均非空，空计划会直接崩）
+            from src.planner.ptt_schema import (
+                ActionContract,
+                PTTPlan,
+                TacticNode,
+                TechniqueNode,
+            )
+            fallback_target = seed_targets[0] if seed_targets else self._scope.target
             fallback_plan = PTTPlan(
                 plan_id=f"plan-fallback-{uuid.uuid4().hex[:8]}",
                 goal=goal,
                 normalized_goal=goal,
                 project_id=self._project_id,
                 scope_id=self._scope_id,
-                tactics=[],
+                tactics=[
+                    TacticNode(
+                        tactic_id="reconnaissance",
+                        name="Reconnaissance",
+                        techniques=[
+                            TechniqueNode(
+                                technique_id="T1595",
+                                name="Active Scanning",
+                                actions=[
+                                    ActionContract(
+                                        action_id="act-fallback-scan",
+                                        name="Fallback scan",
+                                        description="规划失败时的降级侦察动作",
+                                        technique_id="T1595",
+                                        target_refs=[fallback_target],
+                                        expected_outputs=["service.exposed"],
+                                        risk_level="low",
+                                        stop_conditions=["扫描完成"],
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ],
                 generated_by="fallback",
             )
             self._tree = PTTTree.from_plan(fallback_plan)
@@ -654,15 +684,20 @@ class HiveOrchestrator:
     # ── internal: session ───────────────────────────────────────────────
 
     def _open_session(self) -> None:
-        """Record session as RUNNING."""
-        session = ExecutionSession(
-            session_id=self._session_id,
-            project_id=self._project_id,
-            task_id="hive-root",
-            agent_id="hive-orchestrator",
-            status=SessionStatus.RUNNING,
-        )
-        self._store.save_session(session)
+        """Record session as RUNNING — idempotent when the same session is re-run."""
+        session = self._store.get_session(self._session_id)
+        if session is None:
+            session = ExecutionSession(
+                session_id=self._session_id,
+                project_id=self._project_id,
+                task_id="hive-root",
+                agent_id="hive-orchestrator",
+                status=SessionStatus.RUNNING,
+            )
+            self._store.save_session(session)
+        else:
+            session.status = SessionStatus.RUNNING
+            self._store.update_session(session)
 
     def _close_session(self, status: SessionStatus) -> None:
         """Mark session with terminal status."""
